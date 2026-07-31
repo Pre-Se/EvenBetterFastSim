@@ -1,0 +1,85 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>  
+		<OutputType>WinExe</OutputType>  
+		<TargetFramework>net10.0-windows7.0</TargetFramework>
+		<LangVersion>preview</LangVersion>
+		<Nullable>enable</Nullable>  
+		<UseWPF>true</UseWPF>  
+		<Configurations>Debug;Release;DebugLocal</Configurations>  
+		<DebugLocalDependenciesPath>$([System.Environment]::GetFolderPath(SpecialFolder.UserProfile))\source\repos\SecsGemBase\SecsGemMessageHandling\bin\Debug\net10.0\</DebugLocalDependenciesPath>
+		<DebugLocalEnginePath>$([System.Environment]::GetFolderPath(SpecialFolder.UserProfile))\source\repos\SecsGemBase\SecsGemScenarioEngine\bin\Debug\net10.0\</DebugLocalEnginePath>
+		<LoggingPath>$([System.IO.Path]::GetFullPath('$(DebugLocalDependenciesPath)Logging.dll'))</LoggingPath>
+		<SecsGemBaseItemsPath>$([System.IO.Path]::GetFullPath('$(DebugLocalDependenciesPath)SecsGemBaseItems.dll'))</SecsGemBaseItemsPath>
+		<SecsGemHelperClassesPath>$([System.IO.Path]::GetFullPath('$(DebugLocalDependenciesPath)SecsGemHelperClasses.dll'))</SecsGemHelperClassesPath>
+		<SecsGemMessageHandlingPath>$([System.IO.Path]::GetFullPath('$(DebugLocalDependenciesPath)SecsGemMessageHandling.dll'))</SecsGemMessageHandlingPath>
+		<TCPIPBaseLibraryPath>$([System.IO.Path]::GetFullPath('$(DebugLocalDependenciesPath)TCPIPBaseLibrary.dll'))</TCPIPBaseLibraryPath>
+		<SecsGemScenarioEnginePath>$([System.IO.Path]::GetFullPath('$(DebugLocalEnginePath)SecsGemScenarioEngine.dll'))</SecsGemScenarioEnginePath>
+		<LocalLibraryExist>false</LocalLibraryExist>
+		<LocalLibraryExist Condition="$([System.IO.File]::Exists('$(LoggingPath)')) AND &#xD;&#xA;                    $([System.IO.File]::Exists('$(SecsGemBaseItemsPath)')) AND &#xD;&#xA;                    $([System.IO.File]::Exists('$(SecsGemHelperClassesPath)')) AND &#xD;&#xA;                    $([System.IO.File]::Exists('$(SecsGemMessageHandlingPath)')) AND &#xD;&#xA;                    $([System.IO.File]::Exists('$(TCPIPBaseLibraryPath)')) AND &#xD;&#xA;                    $([System.IO.File]::Exists('$(SecsGemScenarioEnginePath)'))">true</LocalLibraryExist>
+	</PropertyGroup>
+
+	<ItemGroup>  
+		<Compile Remove="Helpers\Copy\**" />  
+		<Compile Remove="Network\**" />  
+		<EmbeddedResource Remove="Helpers\Copy\**" />  
+		<EmbeddedResource Remove="Network\**" />  
+		<None Remove="Helpers\Copy\**" />  
+		<None Remove="Network\**" />  
+		<Page Remove="Helpers\Copy\**" />  
+		<Page Remove="Network\**" />  
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="WPF-UI" Version="4.2.1" />
+		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />  
+		<PackageReference Include="FluentResults" Version="4.0.0" />  
+		<PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.6" />  
+		<PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.6" />  
+		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.6" />  
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.6" />  
+		<PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.6" />  
+		<PackageReference Include="Microsoft.Extensions.Options" Version="10.0.6" />  
+		<PackageReference Include="System.Reactive" Version="6.1.0" />
+		<PackageReference Include="Nodify" Version="7.3.0" />
+		<PackageReference Include="MessagePack" Version="3.*" />
+	</ItemGroup>  
+
+	<ItemGroup Condition="'$(Configuration)'!='DebugLocal' OR '$(LocalLibraryExist)'=='false'">  
+		<PackageReference Include="SecsGemMessageHandling" Version="2.0.*" />  
+		<PackageReference Include="SecsGemScenarioEngine" Version="2.0.*" />  
+	</ItemGroup>  
+
+<ItemGroup Condition="'$(Configuration)'=='DebugLocal' AND '$(LocalLibraryExist)'=='true'">
+<Reference Include="Logging">  
+  <HintPath>$(LoggingPath)</HintPath>  
+</Reference>  
+<Reference Include="SecsGemBaseItems">  
+  <HintPath>$(SecsGemBaseItemsPath)</HintPath>  
+</Reference>  
+<Reference Include="SecsGemHelperClasses">  
+  <HintPath>$(SecsGemHelperClassesPath)</HintPath>  
+</Reference>  
+<Reference Include="SecsGemMessageHandling">  
+  <HintPath>$(SecsGemMessageHandlingPath)</HintPath>  
+</Reference>  
+<Reference Include="TCPIPBaseLibrary">
+  <HintPath>$(TCPIPBaseLibraryPath)</HintPath>
+</Reference>
+<Reference Include="SecsGemScenarioEngine">
+  <HintPath>$(SecsGemScenarioEnginePath)</HintPath>
+</Reference>
+</ItemGroup>  
+
+<ItemGroup>  
+<None Update="appsettings.json">  
+  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>  
+</None>  
+<None Update="Library\SECSGEM_DefaultLibrary.xml">  
+  <CopyToOutputDirectory>Always</CopyToOutputDirectory>  
+</None>  
+<None Update="Library\SECSGEM_Library.xml">  
+  <CopyToOutputDirectory>Always</CopyToOutputDirectory>  
+</None>  
+</ItemGroup>  
+
+</Project>
