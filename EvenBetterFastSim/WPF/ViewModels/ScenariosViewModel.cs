@@ -38,10 +38,9 @@ public partial class ScenarioListItem : ObservableObject
 
 public partial class ScenariosViewModel : ObservableObject
 {
-    private static readonly string ScenariosIndexPath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "EvenBetterFastSim",
-        "scenarios.json");
+    // Redirected per InstanceContext so each launched instance keeps its own scenario index.
+    private static string ScenariosIndexPath =>
+        Path.Combine(Services.InstanceContext.SettingsDirectory, "scenarios.json");
 
     private readonly ScenarioExecutionService scenarioExecutionService;
     private readonly ISecsGemLibraryManager libraryManager;

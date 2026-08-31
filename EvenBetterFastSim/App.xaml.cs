@@ -37,6 +37,10 @@ public partial class App
 
     private static ServiceProvider ConfigureServices()
     {
+        // Decide which instance profile (if any) this process runs as before any
+        // settings path is resolved.
+        InstanceContext.InitFromCommandLine();
+
         var services = new ServiceCollection();
 
         services.AddSingleton<ILogService<LoggedString>, LogService<LoggedString>>();
@@ -48,6 +52,8 @@ public partial class App
         });
 
         services.AddScoped<MainViewModel>();
+        services.AddScoped<LauncherViewModel>();
+        services.AddScoped<InstanceProfileStore>();
         services.AddTransient<SetUpViewModel>();
         services.AddTransient<SecsGemDataMessageViewModel>();
         services.AddTransient<SecsGemItemViewModel>();
@@ -121,7 +127,14 @@ public partial class App
         var serviceScope = serviceProvider.CreateScope();
         var viewModelLocator = serviceScope.ServiceProvider.GetRequiredService<ViewModelLocator>();
         var windowManager = serviceScope.ServiceProvider.GetRequiredService<IWindowManager>();
-        windowManager.ShowWindow(viewModelLocator.GetViewModel<MainViewModel>());
+
+        // No --profile => show the hub that launches profile instances.
+        // With --profile => this process *is* an instance; open the simulator directly.
+        if (InstanceContext.ProfileName is null)
+            windowManager.ShowWindow(viewModelLocator.GetViewModel<LauncherViewModel>());
+        else
+            windowManager.ShowWindow(viewModelLocator.GetViewModel<MainViewModel>());
+
         base.OnStartup(e);
     }
 }

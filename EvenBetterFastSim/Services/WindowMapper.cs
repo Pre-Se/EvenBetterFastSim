@@ -17,6 +17,8 @@ public class WindowMapper
     public WindowMapper()
     {
         RegisterMapping<MainViewModel, MainWindow>();
+        RegisterMapping<LauncherViewModel, LauncherWindow>();
+        RegisterMapping<InstanceProfileViewModel, DialogWindow>();
         RegisterMapping<SetUpViewModel, DialogWindow>();
         RegisterMapping<SecsGemDataMessageViewModel, DialogWindow>();
         RegisterMapping<SecsGemItemViewModel, DialogWindow>();

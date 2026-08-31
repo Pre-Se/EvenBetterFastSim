@@ -87,6 +87,15 @@ public partial class MainViewModel : ObservableObject, IBaseViewModel
     public EventLibraryManager EventLibraryManager { get; }
     public ScenariosViewModel ScenariosVm { get; }
 
+    /// <summary>
+    /// Window/taskbar title. Includes the instance profile name and endpoint so multiple
+    /// running instances can be told apart; plain "EvenBetterFastSim" when no profile is active.
+    /// </summary>
+    public string WindowTitle =>
+        InstanceContext.ProfileName is { } profile
+            ? $"EvenBetterFastSim — {profile}  ({ApplicationSettings.NetworkSettings.ConnectionMode} :{ApplicationSettings.NetworkSettings.Port})"
+            : "EvenBetterFastSim";
+
     public MainViewModel(CommunicationHandler messageHandler,
         IWindowManager windowManager,
         ViewModelLocator viewModelLocator,

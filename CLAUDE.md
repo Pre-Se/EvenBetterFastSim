@@ -68,6 +68,23 @@ The scenario editor uses **Nodify** (v7.3.0) for the node graph canvas. See **[s
 - **Results**: `FluentResults` for error handling
 - **SECS/GEM protocol**: configured via HSMS parameters (T3–T8 timers, SessionId) in `appsettings.json`
 
+## Multi-instance Hub
+
+Launching the app **without** arguments shows `LauncherWindow` (the "Hub", VM `LauncherViewModel`)
+instead of `MainWindow`. The Hub manages named `InstanceProfile`s (name + IP/port/mode) stored in
+`%APPDATA%\EvenBetterFastSim\profiles\profiles.json` and launches each as its **own process** via
+`Process.Start(... --profile <name>)`. "New linked pair" creates a Passive + Active profile sharing
+one endpoint so two instances can talk immediately.
+
+`Services/InstanceContext.cs` reads `--profile <name>` at startup (first line of
+`App.ConfigureServices()`) and redirects every per-instance file to
+`%APPDATA%\EvenBetterFastSim\profiles\<name>\` — `SaveToJsonService.UserSettingsPath` and
+`ScenariosViewModel.ScenariosIndexPath` both derive from `InstanceContext.SettingsDirectory`.
+No profile ⇒ the legacy `%APPDATA%\EvenBetterFastSim\` paths (backward compatible).
+`InstanceProfileStore.SeedSettingsFile()` merges the profile's endpoint into that folder's
+`usersettings.json` on create/edit/launch, preserving other in-app setting edits.
+`MainViewModel.WindowTitle` shows the profile name + endpoint so instances are distinguishable.
+
 ## Settings Change Flow
 
 Port properties (IP, port, connection mode, HSMS timers) are edited in `SetUpWindow` / `SetUpViewModel`. The viewmodel holds local copies (`NetworkSettingsCopy`, `HsmsParametersCopy`) so the user can cancel without affecting the live state.

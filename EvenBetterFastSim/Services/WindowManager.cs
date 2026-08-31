@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Linq;
 using System.Windows;
 using EvenBetterFastSim.WPF.ViewModels;
 
@@ -17,6 +18,15 @@ internal class WindowManager(WindowMapper windowMapper) : IWindowManager
     public bool? ShowDialog(IBaseViewModel viewModel)
     {
         var window = GetWindow(viewModel);
+
+        // Anchor the modal to the currently active window so it can never open behind its
+        // parent (which would leave the parent modally disabled and looking frozen).
+        var owner = Application.Current?.Windows
+            .OfType<Window>()
+            .FirstOrDefault(w => w.IsActive && !ReferenceEquals(w, window));
+        if (owner != null)
+            window.Owner = owner;
+
         return window.ShowDialog();
     }
 

@@ -17,6 +17,9 @@
         <DataTemplate DataType="{x:Type viewModels:SetUpViewModel}">
             <windows:SetUpWindow />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type viewModels:InstanceProfileViewModel}">
+            <windows:InstanceProfileView />
+        </DataTemplate>
         <DataTemplate DataType="{x:Type viewModels:SecsGemItemViewModel}">
             <windows:SecsGemItemView />
         </DataTemplate>

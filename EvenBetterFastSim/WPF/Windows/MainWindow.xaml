@@ -16,6 +16,7 @@
         d:DataContext="{d:DesignInstance Type=viewModels:MainViewModel}"
         mc:Ignorable="d"
         Name="MainWin"
+        Title="{Binding WindowTitle}"
         Height="800" Width="1280"
         MinHeight="600" MinWidth="900">
 
@@ -119,7 +120,7 @@
         </Grid.RowDefinitions>
 
         <!-- Title bar (provides drag + Win11 window buttons) -->
-        <ui:TitleBar Grid.Row="0" Title="EvenBetterFastSim" />
+        <ui:TitleBar Grid.Row="0" Title="{Binding WindowTitle}" />
 
         <!-- Menu bar -->
         <Border Grid.Row="1"
