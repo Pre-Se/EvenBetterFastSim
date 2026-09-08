@@ -1,11 +1,19 @@
 # SecsGemBase Library
 
-Location: `%USERPROFILE%\source\repos\SecsGemBase\`
-NuGet package: `SecsGemMessageHandling`
+Location: `%USERPROFILE%\source\repos\SecsGemBase\` ([GitHub: Pre-Se/SecsGemBase](https://github.com/Pre-Se/SecsGemBase))
+NuGet packages (nuget.org, pre-release): `SecsGemBase.MessageHandling`, `SecsGemBase.ScenarioEngine`
+
+Related docs: [SESSION_REFACTORING_LOG.md](../SESSION_REFACTORING_LOG.md), [patterns.md](patterns.md), [CLAUDE.md](../CLAUDE.md)
 
 ## Class Hierarchy
 
-`DataItem` (ObservableObject) → `SecsGemItem`, `SecsGemDataMessage`
+```
+DataItem (ObservableObject)
+  ├── SecsGemItem (abstract)
+  │     ├── SecsGemListItem        (FormatType = List)
+  │     └── SecsGemValueItem<T>    (all value types; Values: ObservableCollection<T>)
+  └── SecsGemDataMessage
+```
 
 ### DataItem (`SecsGemBaseItems/Data Containers/DataItem.cs`)
 
@@ -14,15 +22,36 @@ NuGet package: `SecsGemMessageHandling`
 - `Children`: `ObservableCollection<IDataItem>`
 - `SetParent(ICanBeParent?)` — removes from old parent, adds to new parent via `TryAddChild`
 
-### SecsGemItem (`SecsGemBaseItems/Data Containers/SecsGemItem.cs`)
+### SecsGemItem (`SecsGemBaseItems/Data Containers/SecsGemItem.cs`) — abstract
 
 - `FormatType`: `SecsGemItemFormatType` enum (List, ASCII, Binary, U1..U8, I1..I8, Float, Double, Boolean, JIS8, TwoByteCharacter)
-- `Values`: `ObservableCollection<string>` — initialized to `[string.Empty]` in field initializer
-- Constructor subscribes: `PropertyChanged += SetName`, `Values.CollectionChanged += SetName`, `Children.CollectionChanged += SetName`
+- **`Values` moved to `SecsGemValueItem<T>`** — the base exposes non-generic accessors instead:
+  - `Create(SecsGemItemFormatType)` static factory → `SecsGemValueItem<T>` / `SecsGemListItem`
+  - `GetBoxedValues()` / `GetStringValues()` / `SetValuesFromStrings()`
+- Constructor subscribes: `PropertyChanged += SetName`, `Children.CollectionChanged += SetName`
 - `Name` is auto-set by `SetName()`:
   - List: `"List(N)"` where N = children count
   - Binary: `"Binary = 0xABCD..."` (hex, concatenated)
   - Others: `"FormatType = firstValue"`
+
+### T → FormatType Mapping (`SecsGemValueItem<T>`)
+
+| `T` | FormatTypes |
+|---|---|
+| `byte` | Binary, U1 |
+| `sbyte` | I1 |
+| `bool` | Boolean |
+| `ushort` | U2 |
+| `short` | I2 |
+| `uint` | U4 |
+| `int` | I4 |
+| `ulong` | U8 |
+| `long` | I8 |
+| `float` | Float |
+| `double` | Double |
+| `string` | ASCII, JIS8, TwoByteCharacter |
+
+`FormatType` stays on the base to distinguish wire-level encoding (e.g., Binary vs U1 both use `T=byte`, but have different SECS II format bytes).
 
 ### SecsGemDataMessage (`SecsGemBaseItems/Data Containers/SecsGemDataMessage.cs`)
 
@@ -31,31 +60,42 @@ NuGet package: `SecsGemMessageHandling`
 
 ## Clone Pattern
 
-No MemberwiseClone. Both Clone methods use explicit construction:
+**No MemberwiseClone.** `SecsGemItem.Clone()` is abstract; the concrete types build clones explicitly:
 
 ```csharp
-// SecsGemItem.Clone()
-public SecsGemItem Clone()
+// SecsGemValueItem<T>.Clone()
+public override SecsGemItem Clone()
 {
-    var clone = new SecsGemItem();
-    clone.CopyFrom(this);
+    var clone = new SecsGemValueItem<T>
+    {
+        FormatType = FormatType,
+        Description = Description
+    };
+    clone.Values.Clear();
+    foreach (var v in Values)
+        clone.Values.Add(v);
     foreach (var child in Children.OfType<SecsGemItem>().Select(c => c.Clone()))
         child.SetParent(clone);
     return clone;
 }
 
-// SecsGemDataMessage.Clone()
-public ISecsGemDataMessage Clone()
+// SecsGemListItem.Clone()
+public override SecsGemItem Clone()
 {
-    var clone = new SecsGemDataMessage();
-    clone.CopyFrom(this);
+    var clone = new SecsGemListItem
+    {
+        Description = Description
+    };
     foreach (var child in Children.OfType<SecsGemItem>().Select(c => c.Clone()))
         child.SetParent(clone);
     return clone;
 }
+
+// SecsGemDataMessage.Clone() — explicit new + CopyFrom + recurse children
+// SecsGemTransaction.Clone() — new SecsGemTransaction + cloned Primary/Reply messages
 ```
 
-MemberwiseClone is banned: it copies the PropertyChanged invocation list, so clones fire handlers on the original instance (Name/Header never updates on the clone).
+MemberwiseClone is banned: it copies the PropertyChanged invocation list, so clones fire handlers on the original instance (Name/Header never updates on the clone). See [patterns.md](patterns.md).
 
 ## CopyFrom Rules
 
@@ -71,20 +111,20 @@ Values = new(source.Values);
 ```
 
 `SecsGemDataMessage.CopyFrom` copies: `Reply`, `Stream`, `Function`, `IsPrimary`, `Description`.
-`SecsGemItem.CopyFrom` copies: `Description`, `FormatType`, Values (in-place).
+`SecsGemItem.CopyFrom` copies: `Description`, `FormatType`, Values (in-place, when the source is the same `T`).
 
 ## Binary Format
 
-Binary values are stored as **2-digit uppercase hex strings** (e.g., `"FF"`, `"0A"`).
+Binary values are stored as **`byte[]`** (`SecsGemValueItem<byte>`) after the generic refactor — no more hex-string round-trip. `GetStringValues()` produces **2-digit uppercase hex strings** (e.g., `"FF"`, `"0A"`) for display and wire encoding.
 
 | Location | Change |
 |---|---|
-| `MessageParsing.cs` parsing | `itemDataBytes[0].ToString("X2")` |
-| `ItemFactory.cs` AddBinary | `value.ToString("X2")` |
+| `ItemFactory.cs` AddBinary | `AddBinary(byte value, ...)` — stores raw byte, no hex |
+| `SecsGemItem.GetStringValues()` | `byte.ToString("X2")` for Binary |
 | `SecsGemItem` serialization | `Convert.ToByte(value, 16)` |
-| `SecsGemItem` display | `"0x" + string.Join("", Values)` |
+| `SecsGemItem` display | `"0x" + string.Join("", GetStringValues())` |
 | `DataMessageHandler` CheckValue | `["00"]` not `["0"]` |
-| `SpecialCasesHandling` parsing | `NumberStyles.HexNumber` |
+| `SpecialCasesHandling` parsing | `NumberStyles.HexNumber`, `boxed[0] is byte b ? b.ToString("X2")` |
 
 ## ICanBeParent
 
@@ -111,8 +151,10 @@ Key rules:
 
 Pre-allocates output array once — O(n). Old code called `Combine(growingArray, singleByte)` in a loop which is O(n²) and hangs for large binary payloads.
 
-Binary is special-cased to avoid per-element array allocations:
+Binary is special-cased to avoid per-element array allocations.
 
 ## CommunicationHandler — serialization off UI thread
 
 `BuildMessageData` (which calls `message.ToBytes()`) is wrapped in `Task.Run` before `SendDataAsync`. Keeps UI responsive for large messages since serialization runs entirely on the thread pool before the first network write.
+
+Also: `SendAndLogMessage` awaits `SendDataMessage(...).ConfigureAwait(false)` so the SEND timestamp is captured immediately after the TCP send (see [CLAUDE.md](../CLAUDE.md#message-logging-system)).

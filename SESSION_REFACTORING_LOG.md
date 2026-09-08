@@ -1,4 +1,6 @@
-# Refactoring Session Log — June 2026
+# Refactoring Session Log — June 2026 (refactor complete)
+
+Related docs: [CLAUDE.md](CLAUDE.md), [specification/secsgembase_library.md](specification/secsgembase_library.md), [specification/patterns.md](specification/patterns.md).
 
 ## Summary
 
@@ -131,32 +133,30 @@ Binary uses `T=byte`. 500KB = 500K entries in a contiguous `byte[]` backing arra
 
 ---
 
-## Files That Need to Be RE-APPLIED (Current State)
+## Files Re-Applied — Final State (done)
 
-The following EvenBetterFastSim files were reverted to their pre-refactoring state and need the refactored code re-applied:
+The following EvenBetterFastSim files were reverted to their pre-refactoring state during the session and have since been re-applied and verified (Sept 2026). The refactor is live in both repos.
 
-| File | What's broken |
+| File | Status |
 |---|---|
-| `WPF/ViewModels/SecsGemItemViewModel.cs` | `new SecsGemItem()` (abstract), `.Values` on base (doesn't exist) |
-| `WPF/ViewModels/InspectSecsGemItemViewModel.cs` | `.Values` on 4 lines |
-| `WPF/ViewModels/AddEquipmentVariableViewModel.cs` | `new SecsGemItem()`, `.Values` |
-| `WPF/ViewModels/MainViewModel.cs` | `new SecsGemItem()` at line 203 |
-| `Services/LibraryJsonService.cs` | `new SecsGemItem()`, `.Values` |
-| `Services/LibraryMessagePackService.cs` | `new SecsGemItem()`, `.Values` |
-| `Services/LibraryXmlExportService.cs` | `.Values` at line 67 |
+| `WPF/ViewModels/SecsGemItemViewModel.cs` | ✅ Uses `SecsGemItem.Create()`, `SecsGemValueItem<byte>`, `EnsureCorrectCopyType()` |
+| `WPF/ViewModels/InspectSecsGemItemViewModel.cs` | ✅ Uses `GetStringValues()` |
+| `WPF/ViewModels/AddEquipmentVariableViewModel.cs` | ✅ Uses `SecsGemItem.Create()`, `EnsureCorrectCopyType()` |
+| `WPF/ViewModels/MainViewModel.cs` | ✅ `SecsGemItem.Create(SecsGemItemFormatType.U1).SetParent(parent)` (line 217) |
+| `Services/LibraryJsonService.cs` | ✅ Uses `SecsGemItem.Create()`, `GetStringValues()`, `SetValuesFromStrings()` |
+| `Services/LibraryMessagePackService.cs` | ✅ Uses `SecsGemItem.Create()`, `SetValuesFromStrings()` |
+| `Services/LibraryXmlExportService.cs` | ✅ Uses `GetStringValues()` |
+
+Covered by tests: `EvenBetterFastSim.Tests/SecsGemItemBinaryTests.cs` (binary manual-hex entry + empty entry round-trip).
 
 ---
 
-## Known Remaining Issue: Message Log Out of Order
+## Message Log Out of Order — RESOLVED (via `ConfigureAwait(false)`)
 
-**Problem:** Sent messages sometimes appear after received messages in the message log tree view.
+**Original problem:** Sent messages sometimes appeared after received messages in the message log tree view.
 
-**Root cause:** `EventBusT.cs` uses `ObserveOn(ThreadPoolScheduler.Instance)`. `SecsMessageLogger` subscribes to both `OnDataMessageIn` and `OnDataMessageOut` (filtered views of same bus). Both subscriptions run on arbitrary ThreadPool threads. Both call `Dispatcher.Invoke`. If the "Received" subscriber work item runs before "Sent", the UI dispatcher queue has `[Receive, Send]` — out of order.
+**Root cause:** `CommunicationHandler.SendAndLogMessage()` captured the SEND timestamp after `await SendDataMessage(...)`. Without `.ConfigureAwait(false)`, the continuation marshaled back to the WPF dispatcher, so the SEND timestamp could be captured after the RECEIVE timestamp.
 
-**Planned fix (not yet implemented):**
-Add `SequenceNumber` to `ILoggedSecsGemMessage` (auto-incrementing `Interlocked.Increment` at construction time). Change `SecsMessageLogger.AddItemToCollection` from `MessagesLog.Add(msg)` (append) to binary-search-based `MessagesLog.Insert(position, msg)`, sorted by `TimeStamp` + `SequenceNumber` tiebreak.
+**Fix (implemented):** `await SendDataMessage(message, systemBytes).ConfigureAwait(false);` in `SecsGemMessageHandling/Data Handling/CommunicationHandler.cs:187` ([GitHub](https://github.com/Pre-Se/SecsGemBase/blob/initialCommit/SecsGemMessageHandling/Data%20Handling/CommunicationHandler.cs)). The continuation stays on the thread pool, so `DateTime.Now` runs immediately after the TCP send. `SecsMessageLogger` keeps its simple `Dispatcher.InvokeAsync(() => MessagesLog.Add(...))` append — no sequence-number sorting was needed. See [CLAUDE.md](CLAUDE.md#message-logging-system).
 
-**Files to change:**
-- `SecsGemBase/Logging/Interfaces/ILoggedSecsGemMessage.cs` — add `long SequenceNumber { get; }`
-- `SecsGemBase/Logging/LoggedSecsGemMessage.cs` — add auto-increment property
-- `EvenBetterFastSim/Logging/SecsMessageLogger.cs` — sorted insert instead of append
+**Obsolete planned fix (not implemented):** Adding `SequenceNumber` to `ILoggedSecsGemMessage` + binary-search insert in `SecsMessageLogger` — superseded by the timestamp fix above.

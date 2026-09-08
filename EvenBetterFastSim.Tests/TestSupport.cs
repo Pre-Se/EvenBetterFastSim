@@ -61,8 +61,7 @@ internal static class Editor
 internal static class TestPaths
 {
     public static string LibraryDir { get; } = ResolveLibraryDir();
-    public static string LibraryXml => Path.Combine(LibraryDir, "SECSGEM_Library.xml");
-    public static string DefaultLibraryXml => Path.Combine(LibraryDir, "SECSGEM_DefaultLibrary.xml");
+    public static string DefaultLibraryMsgpack => Path.Combine(LibraryDir, "DefaultLibrary.msgpack");
 
     private static string ResolveLibraryDir()
     {

@@ -1,5 +1,7 @@
 # Scenario Canvas — Connection & Node Selection / Deletion
 
+Related docs: [scenario-system.md](scenario-system.md), [CLAUDE.md](../CLAUDE.md)
+
 ## Overview
 
 The **NodifyEditor** (`ScenarioCanvas`) supports selecting and deleting connections and nodes via left-click + Delete, following the Nodify Playground example pattern.
@@ -14,7 +16,7 @@ See also: `SecsGemBaseItems/Data Containers/Serialization/SecsGemTransactionJson
 
 ### Connection selection (left-click)
 
-Left-clicking a connection selects it. The `BaseConnection` style in `NodifyEditor.Resources` sets `IsSelectable="True"` and `IsSelected="{Binding IsSelected}"`, enabling Nodify's built-in selection mechanism via `ConnectionContainer.OnMouseDown` → `ConnectionsMultiSelector.Select()`.
+Left-clicking a connection selects it. The `BaseConnection` style in the `NodifyEditor.ConnectionTemplate` sets `IsSelectable="True"` and `IsSelected="{Binding IsSelected}"`, enabling Nodify's built-in selection mechanism via `ConnectionContainer.OnMouseDown` → `ConnectionsMultiSelector.Select()`.
 
 Selected connections are synced to `ScenariosViewModel.SelectedConnections` (ObservableCollection) via `NodifyEditor.SelectedConnections` binding.
 
@@ -24,9 +26,9 @@ Left-clicking a node selects it. The `ItemContainer` style sets `IsSelected="{Bi
 
 ### Visual feedback
 
-Selected connections are highlighted using a `BaseConnection` style trigger:
-- `Stroke` changes to accent color
-- `StrokeThickness` increases to 3
+Selected connections are highlighted using a `LineConnection` style trigger:
+- `Stroke` / `Fill` change to the system accent color
+- A `DropShadowEffect` (ShadowDepth 0, BlurRadius 14) is applied
 
 ### Deletion (Delete key)
 
@@ -40,11 +42,11 @@ Still available for both connectors ("Disconnect") and connections ("Delete").
 
 | File | Role |
 |---|---|
-| `MainWindow.xaml:513-607` | NodifyEditor with `SelectedItems`, `SelectedConnections` bindings, `KeyBinding`, styles |
+| `MainWindow.xaml:526-641` | NodifyEditor with `SelectedItems`, `SelectedConnections` bindings, `KeyBinding`, styles |
 | `MainWindow.xaml.cs` | Code-behind (drag-and-drop only now; selection/deletion handled by Nodify + bindings) |
-| `ScenariosViewModel.cs:57-61,66-68,94-100` | `SelectedConnections`, `SelectedNodes`, `DeleteSelectionCommand` |
-| `ConnectionViewModel.cs:28-31` | `IsSelected` property (two-way bound to `BaseConnection.IsSelected`) |
-| `ScenarioNodeViewModel.cs:34-35` | `IsSelected` property (two-way bound to `ItemContainer.IsSelected`) |
+| `ScenariosViewModel.cs:68-73,78,109-114` | `SelectedConnections`, `SelectedNodes`, `DeleteSelectionCommand` |
+| `ConnectionViewModel.cs:24` | `IsSelected` property (two-way bound to `BaseConnection.IsSelected`) |
+| `ScenarioNodeViewModel.cs:30` | `IsSelected` property (two-way bound to `ItemContainer.IsSelected`) |
 
 ## Architecture note
 

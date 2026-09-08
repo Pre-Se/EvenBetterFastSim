@@ -1,9 +1,7 @@
 # EvenBetterFastSim: The reliable SECS/GEM tool
 ---------------------------------------------------------
-EvenBetterFastSim is a WPF desktop utility for emulating SEMI **SECS/GEM** semiconductor
-equipment communication. It lets you stand up a fake tool (or host) on your machine,
-drive HSMS/SECS-II message exchanges by hand or from scripted scenarios, and watch every
-byte that goes over the wire — without any real equipment.
+EvenBetterFastSim is a desktop utility for emulating SEMI SECS/GEM equipment communication. It lets you emulate an equipment or host on your PC,
+and exchange HSMS/SECS-II messages manually or create your own scripted scenarios.
 
 ## Features
 ----------
@@ -33,8 +31,7 @@ dotnet run --project EvenBetterFastSim/EvenBetterFastSim.csproj
 
 ### 1. Pick or create an instance (the Hub)
 
-Launching the app with **no arguments** opens the **Hub**. Each row is a named *instance
-profile* (a name plus an IP / port / connection mode); every profile launches as its own
+Launching the app with **no arguments** opens the **Hub**. Each row is a named instance (a name plus an IP / port / connection mode/library); every profile launches as its own
 process so you can run several simulators side by side.
 
 ![The Hub / launcher window](docs/images/hub.png)
@@ -84,7 +81,7 @@ to shape the payloads, or **Library ▸ Save Library** to export your edits back
 
 Define status/data variables under **Variables**, group them into **Reports**, then attach
 reports to a collection event under **Events**. **Send Event** builds and sends the
-corresponding **S6F11** event report. (These lists start empty — populate them per your
+corresponding **S6F11** event report. (These lists start empty, populate them per your
 equipment model.)
 
 ### 6. Scenarios
@@ -96,11 +93,9 @@ transaction from the **DRAG TO CANVAS** palette onto the canvas, wire nodes from
 to **End**, and press **Run** to execute them in order against the live connection.
 
 Node types: **Send**, **Send & Wait** (send and wait for the reply), **Receive** (wait for a
-matching incoming message, 30 s timeout) and **Wait** (a fixed delay). Scenarios are saved
-per instance and can be exported / imported.
+matching incoming message, 30 s timeout) and **Wait** (a fixed delay). Scenarios are saved per instance and can be exported / imported.
 
 ### 7. Two instances talking
 
 Create a **linked pair** in the Hub and launch both. One listens (Passive), the other dials
-in (Active); once HSMS shows **Selected** on both, send a message from either side and watch
-it arrive in the other instance's Message Log.
+in (Active); once HSMS shows **Selected** on both, send a message from either side.

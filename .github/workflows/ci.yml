@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0            # Nerdbank.GitVersioning (in Directory.Build.props) wants full history
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build (Release) — same config the release workflow ships
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet build EvenBetterFastSim/EvenBetterFastSim.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw "Release build failed" }
+
+      - name: Test
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet test EvenBetterFastSim.Tests --no-build --verbosity normal
+          if ($LASTEXITCODE -ne 0) { throw "Tests failed" }

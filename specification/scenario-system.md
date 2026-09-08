@@ -1,6 +1,8 @@
 # Scenario System — Architecture & Reference
 
-> Covers 20 files / ~3000 lines across EvenBetterFastSim and SecsGemBase.
+> Covers ~22 files / ~3600 lines across EvenBetterFastSim and SecsGemBase.
+
+Related docs: [scenario-canvas-selection-deletion.md](scenario-canvas-selection-deletion.md), [project_overview.md](project_overview.md), [secsgembase_library.md](secsgembase_library.md), [CLAUDE.md](../CLAUDE.md)
 
 ## Table of Contents
 
@@ -21,7 +23,7 @@
 
 The scenario system lets users build a visual node graph representing a SECS/GEM message exchange sequence. Nodes (Send, Receive, Wait, Condition, etc.) are connected by edges. The graph is executed sequentially, dispatching real SECS/GEM messages over HSMS.
 
-**Technology:** WPF + Nodify (v7.3.0) for the canvas, CommunityToolkit.MVVM for ViewModels, System.Text.Json for serialization, SecsGemMessageHandling NuGet for HSMS communication.
+**Technology:** WPF + Nodify (v7.3.0) for the canvas, CommunityToolkit.MVVM for ViewModels, System.Text.Json for serialization, `SecsGemBase.MessageHandling` NuGet for HSMS communication.
 
 ---
 
@@ -59,7 +61,7 @@ The scenario system lets users build a visual node graph representing a SECS/GEM
 │  └─ NodeType enum                                         │
 │                                                           │
 │  ScenarioExecutionService                                 │
-│  ├─ ExecuteAsync → DFS traversal → ExecuteNodeAsync       │
+│  ├─ ExecuteAsync → linear walk → ExecuteNodeAsync          │
 │  ├─ ExecuteSendAsync (sends via DataMessageHandler)       │
 │  ├─ ExecuteWaitAsync (Task.Delay)                         │
 │  └─ ExecuteReceiveAsync (waits for matching inbound msg)  │
@@ -125,7 +127,7 @@ Start → [Send/SendAndWait] → [Receive] → [Wait] → ... → End
          │  on reply → next   │  msg → next│  → next
 ```
 
-DFS from Start node follows edges to build linear execution order. Branches (Condition) are not yet handled.
+Linear walk from Start node follows edges (success/failure) to build the execution order. Branches (Condition) are not yet handled.
 
 ---
 
@@ -144,7 +146,7 @@ DFS from Start node follows edges to build linear execution order. Branches (Con
 2. `NodifyEditor.SelectedItems` bound to `ScenariosViewModel.SelectedNodes`
 
 ### Visual feedback
-- Selected connections: stroke changes to accent color, thickness increases to 3 (via `BaseConnection` style trigger)
+- Selected connections: stroke/fill change to accent color + drop-shadow effect (via `LineConnection` style trigger)
 - Selected nodes: Nodify's default `ItemContainer` selection border
 
 ### Deletion
@@ -156,12 +158,13 @@ DFS from Start node follows edges to build linear execution order. Branches (Con
 | Right-click connector → Disconnect | Context menu on `NodeInput`/`NodeOutput` bound to `DisconnectConnectorCommand` with `ConnectorViewModel` as parameter |
 
 ### Key files
-- `MainWindow.xaml:525-540` — `BaseConnection` style + `ItemContainer` style with `BasedOn`
-- `MainWindow.xaml:513-519` — NodifyEditor bindings (`SelectedItems`, `SelectedConnections`)
-- `MainWindow.xaml:527-529` — `KeyBinding` for Delete
-- `ConnectionViewModel.cs:28-31` — `IsSelected` property
-- `ScenarioNodeViewModel.cs:29-30` — `IsSelected` property
-- `ScenariosViewModel.cs:57-61, 66-68, 94-100` — `SelectedConnections`, `SelectedNodes`, `DeleteSelectionCommand`
+- `MainWindow.xaml:528-539` — NodifyEditor bindings (`SelectedItems`, `SelectedConnections`)
+- `MainWindow.xaml:540-542` — `KeyBinding` for Delete
+- `MainWindow.xaml:543-548` — `ItemContainer` style with `BasedOn` + `IsSelected` binding
+- `MainWindow.xaml:596-614` — connection template: `LineConnection` style trigger (accent stroke + drop shadow)
+- `ConnectionViewModel.cs:24` — `IsSelected` property
+- `ScenarioNodeViewModel.cs:30` — `IsSelected` property
+- `ScenariosViewModel.cs:68-73, 78, 109-114` — `SelectedConnections`, `SelectedNodes`, `DeleteSelectionCommand`
 
 ---
 
@@ -255,17 +258,17 @@ var received = await dataMessageHandler.WaitForReceivedMessage(
 
 ### File
 
-`SecsGemBase/SecsGemScenarioEngine/Services/ScenarioExecutionService.cs` (243 lines)
+`SecsGemBase/SecsGemScenarioEngine/Services/ScenarioExecutionService.cs` (244 lines)
 
 ### Flow
 
 ```
 RunScenario(graph)
-  ├─ GetExecutionOrder(graph)
-  │    └─ DFS from Start node, following all outgoing edges
-  │       (order excludes Start, includes End)
+  ├─ ExecuteAsync: linear walk from Start following edges
+  │    └─ GetNextNodeId(graph, currentId, isSuccess) picks
+  │       the next node; visited set detects cycles
   │
-  ├─ foreach node in order:
+  ├─ foreach node in walk:
   │    └─ ExecuteNodeAsync(node, token)
   │         ├─ Start/End → skip (success)
   │         ├─ Send / SendAndWait → ExecuteSendAsync
@@ -291,7 +294,7 @@ RunScenario(graph)
 
 ### Source
 
-`TransactionTree_PreviewMouseMove` in `MainWindow.xaml.cs:68-89`
+`TransactionTree_PreviewMouseMove` in `MainWindow.xaml.cs:70-99`
 - Fires on `PreviewMouseMove` of each `TreeViewItem` in the library tree
 - Finds the containing `TreeViewItem` via visual tree walk (`VisualTreeHelper.GetParent`)
 - Gets `DataContext` as `SecsGemTransaction`
@@ -299,7 +302,7 @@ RunScenario(graph)
 
 ### Target
 
-`ScenarioCanvas_PreviewDrop` in `MainWindow.xaml.cs:111-125`
+`ScenarioCanvas_PreviewDrop` in `MainWindow.xaml.cs:134-155`
 - `ScenarioCanvas_PreviewDragOver` accepts the drop (checks for `SecsGemTransaction` type)
 - On drop: extracts `SecsGemTransaction` from `e.Data`
 - Converts drop position via `ScenarioCanvas.ViewportTransform.Inverse.Transform(position)` (canvas pan/zoom adjustment)
@@ -318,7 +321,7 @@ Creates `ScenarioNodeViewModel`, serializes cloned transaction as JSON, adds to 
 ## Persistence (scenarios.json)
 
 ### Location
-`%APPDATA%/EvenBetterFastSim/scenarios.json`
+`%APPDATA%/EvenBetterFastSim/scenarios.json` — or `%APPDATA%/EvenBetterFastSim/profiles/<name>/scenarios.json` when launched with `--profile <name>` (`ScenariosViewModel.ScenariosIndexPath` derives from `InstanceContext.SettingsDirectory`).
 
 ### Format
 ```json
@@ -361,26 +364,26 @@ Creates `ScenarioNodeViewModel`, serializes cloned transaction as JSON, adds to 
 | # | File | Lines | Role |
 |---|------|-------|------|
 | | **EvenBetterFastSim** | | |
-| 1 | `WPF/ViewModels/Graph/ScenarioNodeViewModel.cs` | 152 | Visual node VM: connectors, type toggle (Send/Receive) |
+| 1 | `WPF/ViewModels/Graph/ScenarioNodeViewModel.cs` | 166 | Visual node VM: connectors, type toggle (Send/Receive) |
 | 2 | `WPF/ViewModels/Graph/ConnectionViewModel.cs` | 36 | Canvas edge: Source/Target connectors, IsSelected |
 | 3 | `WPF/ViewModels/Graph/PendingConnectionViewModel.cs` | 27 | Drag-to-connect tracking |
 | 4 | `WPF/ViewModels/Graph/ConnectorViewModel.cs` | 37 | Node port: anchor point, connection state |
-| 5 | `WPF/ViewModels/ScenariosViewModel.cs` | 452 | Central orchestrator: CRUD, persistence, run |
-| 6 | `WPF/Windows/MainWindow.xaml` (L451–607) | ~100 | Scenarios tab XAML: canvas, styles, bindings |
-| 7 | `WPF/Windows/MainWindow.xaml.cs` | 126 | Drag-drop from library tree onto canvas |
-| 8 | `App.xaml.cs` | 124 | DI: `ScenariosViewModel` + `ScenarioExecutionService` |
-| 9 | `WPF/ViewModels/MainViewModel.cs` | 585 | Exposes `ScenariosVm` to window DataContext |
+| 5 | `WPF/ViewModels/ScenariosViewModel.cs` | 738 | Central orchestrator: CRUD, persistence, run |
+| 6 | `WPF/Windows/MainWindow.xaml` (L505–641) | ~140 | Scenarios tab XAML: canvas, styles, bindings |
+| 7 | `WPF/Windows/MainWindow.xaml.cs` | 156 | Drag-drop from library tree onto canvas |
+| 8 | `App.xaml.cs` | 139 | DI: `ScenariosViewModel` + `ScenarioExecutionService` |
+| 9 | `WPF/ViewModels/MainViewModel.cs` | 717 | Exposes `ScenariosVm` to window DataContext |
 | | **SecsGemBase** | | |
-| 10 | `SecsGemScenarioEngine/Models/ScenarioNode.cs` | 11 | Serializable node model |
+| 10 | `SecsGemScenarioEngine/Models/ScenarioNode.cs` | 13 | Serializable node model |
 | 11 | `SecsGemScenarioEngine/Models/ScenarioGraph.cs` | 9 | Top-level scenario container |
-| 12 | `SecsGemScenarioEngine/Models/ScenarioEdge.cs` | 7 | Directed edge between node IDs |
+| 12 | `SecsGemScenarioEngine/Models/ScenarioEdge.cs` | 8 | Directed edge between node IDs |
 | 13 | `SecsGemScenarioEngine/Models/NodeType.cs` | 12 | Enum: Start, SendAndWait, Send, End, Condition, Wait, Receive |
-| 14 | `SecsGemScenarioEngine/Services/ScenarioExecutionService.cs` | 243 | Runtime engine: DFS + send/wait/receive |
+| 14 | `SecsGemScenarioEngine/Services/ScenarioExecutionService.cs` | 244 | Runtime engine: linear walk + send/wait/receive |
 | 15 | `SecsGemScenarioEngine/Services/IScenarioExecutionService.cs` | 17 | Interface + result DTO |
-| 16 | `SecsGemBaseItems/Data Containers/SecsGemTransaction.cs` | 83 | Transaction with Primary/Reply messages |
+| 16 | `SecsGemBaseItems/Data Containers/SecsGemTransaction.cs` | 82 | Transaction with Primary/Reply messages |
 | 17 | `SecsGemBaseItems/Data Containers/SecsGemDataMessage.cs` | 133 | SECS/GEM message: Stream, Function, items |
-| 18 | `SecsGemBaseItems/Data Containers/SecsGemItem.cs` | 338 | Leaf data item: format, values, encoding |
+| 18 | `SecsGemBaseItems/Data Containers/SecsGemItem.cs` (+`SecsGemValueItem.cs` 205, `SecsGemListItem.cs` 51) | 193 | Abstract item base + typed value/list items |
 | 19 | `SecsGemBaseItems/Data Containers/Serialization/SecsGemTransactionJsonConverter.cs` | 160 | JSON converter for transaction tree |
-| 20 | `SecsGemMessageHandling/Data Handling/DataMessageHandler.cs` | 329 | HSMS dispatch: send, receive, gate check |
+| 20 | `SecsGemMessageHandling/Data Handling/DataMessageHandler.cs` | 359 | HSMS dispatch: send, receive, gate check |
 
-**Total: 20 files, ~3000 lines across both repositories.**
+**Total: ~22 files, ~3600 lines across both repositories.**

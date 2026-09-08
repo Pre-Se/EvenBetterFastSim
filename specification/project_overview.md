@@ -2,6 +2,8 @@
 
 EvenBetterFastSim is a WPF desktop app (.NET 10, C# preview) simulating SECS/GEM semiconductor equipment communication. Uses MVVM + Microsoft DI.
 
+Related docs: [CLAUDE.md](../CLAUDE.md), [AGENTS.md](../AGENTS.md), [README.md](../README.md), [patterns.md](patterns.md), [dialog_pattern.md](dialog_pattern.md), [secsgembase_library.md](secsgembase_library.md), [features.md](features.md), [scenario-system.md](scenario-system.md)
+
 ## Build
 
 ```bash
@@ -18,7 +20,7 @@ When modifying SecsGemBase: build it first, then rebuild EvenBetterFastSim with 
 - **Transient**: Dialog ViewModels (one per dialog open)
 - **Singleton**: Configuration, `ILoggerProvider`
 
-Transient VMs registered: `SecsGemItemViewModel`, `SecsGemDataMessageViewModel`, `InspectSecsGemItemViewModel`, `SecsGemTransactionViewModel`
+Transient VMs registered: `SetUpViewModel`, `SecsGemItemViewModel`, `SecsGemDataMessageViewModel`, `InspectSecsGemItemViewModel`, `SecsGemTransactionViewModel`, `AddEventReportViewModel`, `AddReportViewModel`, `AddEquipmentVariableViewModel`
 
 ## Key Files
 

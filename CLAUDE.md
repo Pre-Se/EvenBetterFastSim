@@ -13,7 +13,26 @@ Build configurations: `Debug` and `Release` (use the public `SecsGemBase.*` NuGe
 
 When modifying SecsGemBase, publish the updated `SecsGemBase.*` packages to nuget.org, then bump the versions in [EvenBetterFastSim.csproj](EvenBetterFastSim/EvenBetterFastSim.csproj). Or use `DebugLocal` for local iterations: build SecsGemBase first (`dotnet build` in that repo), then rebuild EvenBetterFastSim with `-c DebugLocal`.
 
-There are no automated tests in this project.
+### Tests
+
+`EvenBetterFastSim.Tests` is an xUnit project covering the SecsGemItem binary-save flow. It references the DLLs from the app's `DebugLocal` output, so build the app first:
+
+```bash
+dotnet build EvenBetterFastSim.sln -c DebugLocal
+dotnet test EvenBetterFastSim.Tests
+```
+
+## Docs
+
+- [README.md](README.md) — user guide
+- [specification/project_overview.md](specification/project_overview.md) — architecture summary
+- [specification/patterns.md](specification/patterns.md) — coding rules
+- [specification/dialog_pattern.md](specification/dialog_pattern.md) — dialog wiring
+- [specification/secsgembase_library.md](specification/secsgembase_library.md) — SecsGemBase internals
+- [specification/features.md](specification/features.md) — feature log
+- [specification/scenario-system.md](specification/scenario-system.md) — scenario engine reference
+- [specification/scenario-canvas-selection-deletion.md](specification/scenario-canvas-selection-deletion.md) — canvas selection/deletion
+- [SESSION_REFACTORING_LOG.md](SESSION_REFACTORING_LOG.md) — SecsGemItem generic refactor log
 
 ### Testing HSMS connection behaviour
 
@@ -38,7 +57,7 @@ $listener.Stop()
 |---|---|---|
 | Presentation | `WPF/Windows/`, `WPF/ViewModels/` | XAML views + CommunityToolkit.MVVM ViewModels |
 | Library Management | `WPF/LibraryManager/` | Loads Events, Reports, Equipment Variables; parses SECS/GEM XML libraries |
-| Communication | via `SecsGemMessageHandling` NuGet | HSMS TCP/IP protocol, message transactions, control state machine |
+| Communication | via `SecsGemBase.MessageHandling` NuGet | HSMS TCP/IP protocol, message transactions, control state machine |
 | Logging | `Logging/` | `ILogService<T>` → `ObservableCollection<string>` bound to UI |
 | Configuration | `appsettings.json` + `Services/ApplicationSettings.cs` | Strongly-typed settings (network, HSMS timers) via `Microsoft.Extensions.Configuration` |
 
@@ -59,7 +78,7 @@ All composition happens in [App.xaml.cs](EvenBetterFastSim/App.xaml.cs) `Configu
 
 ### Scenario Canvas
 
-The scenario editor uses **Nodify** (v7.3.0) for the node graph canvas. See **[specifications/scenario-system.md](specifications/scenario-system.md)** for full architecture documentation covering node types, selection/deletion, transaction deep-copy, message comparison, execution engine, drag-and-drop, and persistence.
+The scenario editor uses **Nodify** (v7.3.0) for the node graph canvas. See **[specification/scenario-system.md](specification/scenario-system.md)** for full architecture documentation covering node types, selection/deletion, transaction deep-copy, message comparison, execution engine, drag-and-drop, and persistence.
 
 ### Patterns
 
@@ -97,9 +116,9 @@ Settings are **not** written to `appsettings.json` immediately — they are pers
 
 ## SecsGemBase (library source)
 
-The `SecsGemMessageHandling` NuGet comes from `%USERPROFILE%\source\repos\SecsGemBase\`. Key files there:
+The `SecsGemBase.*` NuGet packages are published from the [SecsGemBase repo](https://github.com/Pre-Se/SecsGemBase) (`%USERPROFILE%\source\repos\SecsGemBase\` locally). Key files there:
 
-- `SecsGemBaseItems/Data Containers/SecsGemItem.cs` — tree node model; `Name` is auto-set via `Children.CollectionChanged`. Adding children via `SetParent()` (not direct `Children =` assignment) is required to keep the name in sync.
+- `SecsGemBaseItems/Data Containers/SecsGemItem.cs` — abstract tree node model (`SecsGemValueItem<T>` / `SecsGemListItem` concrete); `Name` is auto-set via `Children.CollectionChanged`. Adding children via `SetParent()` (not direct `Children =` assignment) is required to keep the name in sync.
 - `SecsGemBaseItems/Data Containers/ItemFactory.cs` — fluent builder for outgoing messages
 - `SecsGemMessageHandling/Data Handling/ControlMessageHandling.cs` — HSMS state machine (NotConnected → NotSelected → Selected); sends SelectReq on connect if `InitiateSelectRequest = true`
 - `SecsGemMessageHandling/Data Handling/TransactionHandler.cs` — manages request/reply pairing with T3/T6 timeouts; calls `RestartConnection()` internally on timeout
@@ -118,29 +137,21 @@ EventBus (ThreadPoolScheduler)
   ├── OnDataMessageOut →  SecsMessageLogger.MessageOut()
   ├── OnControlMessageIn  →  SecsMessageLogger.ControlMessageIn()
   └── OnControlMessageOut →  SecsMessageLogger.ControlMessageOut()
-                              │
-                              ▼
+                               │
+                               ▼
                     AddItemToCollection()
-                              │
-                    ┌─────────┴──────────┐
-                    │ seq = Interlocked  │  ← assigned on ThreadPool thread,
-                    │       .Increment() │     before Dispatcher call (no race)
-                    └─────────┬──────────┘
-                              │
-                    Dispatcher.InvokeAsync()
-                              │
-                    ┌─────────┴──────────┐
-                    │ Insert in sorted   │  ← runs on UI thread
-                    │ order by timestamp │
-                    │ then by sequence   │
-                    └────────────────────┘
+                               │
+                    Dispatcher.InvokeAsync(() =>
+                      MessagesLog.Add(message))
 ```
+
+`SecsMessageLogger` simply appends via `Dispatcher.InvokeAsync`. No sequence-number sorting is needed because timestamps are captured in the right order on the send/receive paths (see below).
 
 ### Out-of-Order Fix
 
 `CommunicationHandler.SendAndLogMessage()` (in SecsGemBase) creates the `LoggedDataMessage` (capturing `TimeStamp = DateTime.Now`) after `await SendDataMessage(...)`. Without `.ConfigureAwait(false)`, the continuation marshals back to the WPF dispatcher because the async chain originated on the UI thread. Meanwhile, `ParseDataReceived()` captures its timestamp immediately on the TCP thread. If the dispatcher is busy, the SEND timestamp can be captured **after** the RECEIVE timestamp — making the send appear later than its reply.
 
-**Fix** ([CommunicationHandler.cs:187](https://github.com/anomalyco/SecsGemBase/blob/master/SecsGemMessageHandling/Data%20Handling/CommunicationHandler.cs)):
+**Fix** ([CommunicationHandler.cs:187](https://github.com/Pre-Se/SecsGemBase/blob/initialCommit/SecsGemMessageHandling/Data%20Handling/CommunicationHandler.cs)):
 
 ```
 var (status, rawData, header) = await SendDataMessage(message, systemBytes).ConfigureAwait(false);
@@ -158,7 +169,7 @@ Each log item renders as:
 [↑/↓ icon] [HH:mm:ss.fff] [message name]
 ```
 
-Defined in [MainWindow.xaml](EvenBetterFastSim/WPF/Windows/MainWindow.xaml) lines 719–748 with two `HierarchicalDataTemplate`s (one for `LoggedControlMessage`, one for `LoggedDataMessage`):
+Defined in [MainWindow.xaml](EvenBetterFastSim/WPF/Windows/MainWindow.xaml) lines 715–757 with two `HierarchicalDataTemplate`s (one for `LoggedControlMessage`, one for `LoggedDataMessage`):
 
 | Element | Details |
 |---|---|
@@ -177,7 +188,7 @@ The `MsgHeaderConverter` ([MessageHeaderConverter.cs](EvenBetterFastSim/Helpers/
 
 ### Cloning
 
-`SecsGemTransaction`, `SecsGemDataMessage`, and `SecsGemItem` all implement `IDeepCloneable<T>` and expose a `Clone()` method. Each uses `MemberwiseClone` then reassigns `Children`, clones the children list into it via `child.SetParent(clone)`, and fixes up any value-type collections (e.g. `Values`).
+`SecsGemItem` is abstract and declares `abstract SecsGemItem Clone()`; the concrete `SecsGemValueItem<T>` / `SecsGemListItem` implement it. `SecsGemTransaction` implements `IDeepCloneable<SecsGemTransaction>`, and `SecsGemDataMessage` exposes `Clone()` via `ISecsGemDataMessage`. **No `MemberwiseClone` anywhere** — clones are built with explicit `new T()` + `CopyFrom()` + recursive `child.SetParent(clone)`. See [specification/patterns.md](specification/patterns.md) and [specification/secsgembase_library.md](specification/secsgembase_library.md).
 
 `SecsGemDataMessage.Clone()` returns `ISecsGemDataMessage`; cast to `SecsGemDataMessage` when assigning to the `PrimaryMessage`/`ReplyMessage` setters.
 

@@ -1,5 +1,7 @@
 # Features
 
+Related docs: [project_overview.md](project_overview.md), [secsgembase_library.md](secsgembase_library.md), [dialog_pattern.md](dialog_pattern.md), [SESSION_REFACTORING_LOG.md](../SESSION_REFACTORING_LOG.md)
+
 ## Inspect received message items
 
 Double-clicking a `SecsGemItem` in the messages log TreeView opens a read-only inspect dialog.
@@ -11,9 +13,9 @@ Double-clicking a `SecsGemItem` in the messages log TreeView opens a read-only i
 - `IsHex` = inverse of `UseBase64` for RadioButton TwoWay binding
 - Format row visibility controlled by `IsBinary`
 
-## Binary values as hex strings
+## Binary values as byte[]
 
-Binary `SecsGemItem` values stored as 2-digit uppercase hex strings. See `secsgembase_library.md` for all touch points.
+Binary values are stored as `byte[]` (`SecsGemValueItem<byte>`) since the generic refactor; `GetStringValues()` renders them as 2-digit uppercase hex strings. See [secsgembase_library.md](secsgembase_library.md) and [SESSION_REFACTORING_LOG.md](../SESSION_REFACTORING_LOG.md) for all touch points.
 
 ## Double-click library items opens edit dialog
 
@@ -36,24 +38,24 @@ Fully wired. Double-clicking a transaction in the library TreeView opens a Name 
 
 ## Upload file as binary
 
-"Upload File" button in `SecsGemItemView` — visible only when `FormatType == Binary`.
+"File Upload" mode in `SecsGemItemView` — visible only when `FormatType == Binary`.
 
-- `FileUploadVisibility` property on `SecsGemItemViewModel`
-- `UploadFileCommand`: opens `OpenFileDialog`, reads all bytes, joins as delimiter-separated hex pairs into `ItemValues`
+- `IsFileUploadMode` property on `SecsGemItemViewModel` (RadioButton "File Upload" / "Manual Entry" toggle)
+- `UploadFileCommand`: opens `OpenFileDialog`, reads all bytes straight into `SecsGemValueItem<byte>.Values` (no hex string split)
 - Button appears inline next to the Value TextBox
 
 ## Save library as XML
 
 Library → Save as XML menu item writes the current transaction library to an XML file in the same format that `XmlParser` reads.
 
-**Files:** `Services/LibraryXmlExportService.cs` (new), `MainViewModel.SaveSecsGemLibraryXmlCommand`, `MainWindow.xaml` menu item
+**Files:** `Services/LibraryXmlExportService.cs`, `MainViewModel.SaveLibrary()` (bound to `SaveLibraryCommand` in `MainWindow.xaml`)
 
 - Multi-value items write one `<Value>` element per entry; parser reads all of them
 - `LibraryXmlExportService` registered as scoped in `App.xaml.cs`
 
 ## Inspect dialog — selectable TextBoxes
 
-All fields in `InspectSecsGemItemView` use `IsReadOnly="True"` TextBoxes instead of TextBlocks — text is selectable and copyable. Value box has `MaxHeight="200"` and `VerticalScrollBarVisibility="Auto"` to stay bounded. Value binding uses `Mode=OneWay` (property is read-only computed).
+All fields in `InspectSecsGemItemView` use `IsReadOnly="True"` TextBoxes instead of TextBlocks — text is selectable and copyable. Value box has `MaxHeight="200"` and `VerticalScrollBarVisibility="Auto"` to stay bounded. Value binding uses `Mode=OneWay` on the read-only computed `ValuesDisplay` property.
 
 ## XML library — multi-value items round-trip correctly
 
