@@ -10,16 +10,18 @@
     <IsTestProject>true</IsTestProject>
 
     <!--
-      The app uses a custom 'DebugLocal' configuration that references the locally
-      built SecsGemBase DLLs (which contain the SecsGemValueItem<T> generics).
-      Rather than re-implement that conditional reference logic, this test project
-      references whatever the app shipped to its DebugLocal output folder.
+      SecsGemBase ships from the public NuGet packages in the Release (and Debug) builds.
+      Only the developer-only 'DebugLocal' config swaps in locally built SecsGemBase DLLs.
+      These tests validate the shipping build, so they reference the app's *Release* output.
 
-      => Build the app once before running the tests:
-           dotnet build EvenBetterFastSim.sln -c DebugLocal
-           dotnet test EvenBetterFastSim.Tests
+      The <Reference> glob below is expanded at evaluation time, so the app's Release
+      output must already exist when this project builds. Run it as two steps:
+           dotnet build EvenBetterFastSim/EvenBetterFastSim.csproj -c Release
+           dotnet test  EvenBetterFastSim.Tests               -c Release
+      (do NOT `dotnet build EvenBetterFastSim.sln` from clean — the test project would
+       evaluate its reference glob before the app output exists.)
     -->
-    <AppOut>$(MSBuildProjectDirectory)\..\EvenBetterFastSim\bin\DebugLocal\net10.0-windows7.0</AppOut>
+    <AppOut>$(MSBuildProjectDirectory)\..\EvenBetterFastSim\bin\Release\net10.0-windows7.0</AppOut>
   </PropertyGroup>
 
   <ItemGroup>
@@ -28,14 +30,14 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
   </ItemGroup>
 
-  <!-- App + SecsGemBase + their NuGet deps, straight from the app's build output. -->
+  <!-- App + SecsGemBase + their NuGet deps, straight from the app's Release output. -->
   <ItemGroup>
     <Reference Include="$(AppOut)\*.dll" />
   </ItemGroup>
 
   <Target Name="EnsureAppIsBuilt" BeforeTargets="ResolveAssemblyReferences">
     <Error Condition="!Exists('$(AppOut)\EvenBetterFastSim.dll')"
-           Text="App output not found at '$(AppOut)'. Build it first: dotnet build EvenBetterFastSim.sln -c DebugLocal" />
+           Text="App Release output not found at '$(AppOut)'. Build it first: dotnet build EvenBetterFastSim/EvenBetterFastSim.csproj -c Release" />
   </Target>
 
 </Project>

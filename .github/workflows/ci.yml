@@ -29,16 +29,19 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Build (Release) — same config the release workflow ships
+      # The app (Release) uses the public SecsGemBase NuGet packages — the same build the
+      # release workflow ships. The test project references the app's Release output via a
+      # glob, so the app must be built first, as its own dotnet invocation.
+      - name: Build app (Release)
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           dotnet build EvenBetterFastSim/EvenBetterFastSim.csproj -c Release
           if ($LASTEXITCODE -ne 0) { throw "Release build failed" }
 
-      - name: Test
+      - name: Test (Release)
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          dotnet test EvenBetterFastSim.Tests --no-build --verbosity normal
+          dotnet test EvenBetterFastSim.Tests/EvenBetterFastSim.Tests.csproj -c Release --verbosity normal
           if ($LASTEXITCODE -ne 0) { throw "Tests failed" }
