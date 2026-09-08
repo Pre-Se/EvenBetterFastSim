@@ -1,10 +1,9 @@
-using System.Collections.ObjectModel;
 using System.Linq;
+using EvenBetterFastSim.Services;
 using EvenBetterFastSim.WPF.ViewModels;
-using SecsGemBaseItems;
+using Microsoft.Extensions.Logging.Abstractions;
 using SecsGemBaseItems.Data_Containers;
 using SecsGemBaseItems.Enums;
-using SecsGemBaseItems.LibraryManager;
 using Xunit;
 
 namespace EvenBetterFastSim.Tests;
@@ -49,14 +48,14 @@ public class SecsGemItemBinaryTests
     }
 
     /// <summary>
-    /// End-to-end through the real load path: the S7F3 PPBODY parsed from the shipped library
-    /// must be Binary (the fix) and must persist entered binary data.
+    /// End-to-end through the real load path: the S7F3 PPBODY loaded from the shipped
+    /// <c>DefaultLibrary.msgpack</c> must be Binary (the fix) and must persist entered binary data.
     /// </summary>
     [Fact]
-    public void Ppbody_LoadedFromLibraryXml_IsBinary_AndSavesHex()
+    public void Ppbody_LoadedFromLibraryMsgpack_IsBinary_AndSavesHex()
     {
-        var library = new ObservableCollection<SecsGemTransaction>();
-        new XmlParser(TestPaths.LibraryXml).LoadItems(library);
+        var library = new LibraryMessagePackService(NullLogger<LibraryMessagePackService>.Instance)
+            .Load(TestPaths.DefaultLibraryMsgpack);
 
         var ppbody = library
             .Select(tx => Editor.FindByDescription(tx.PrimaryMessage.Children, "Process program body"))
