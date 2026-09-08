@@ -9,9 +9,9 @@ dotnet build EvenBetterFastSim.sln
 dotnet run --project EvenBetterFastSim/EvenBetterFastSim.csproj
 ```
 
-Build configurations: `Debug` (uses NuGet packages from GitLab), `DebugLocal` (uses local SecsGemBase repo at `%USERPROFILE%\source\repos\SecsGemBase\`), `Release`.
+Build configurations: `Debug` and `Release` (use the public `SecsGemBase.*` NuGet packages from nuget.org — `SecsGemBase.MessageHandling` and `SecsGemBase.ScenarioEngine`), `DebugLocal` (uses local SecsGemBase repo at `%USERPROFILE%\source\repos\SecsGemBase\`).
 
-When modifying SecsGemBase, push to GitLab, let CI publish the NuGet package, then update EvenBetterFastSim. Or use `DebugLocal` for local iterations: build SecsGemBase first (`dotnet build` in that repo), then rebuild EvenBetterFastSim with `-c DebugLocal`.
+When modifying SecsGemBase, publish the updated `SecsGemBase.*` packages to nuget.org, then bump the versions in [EvenBetterFastSim.csproj](EvenBetterFastSim/EvenBetterFastSim.csproj). Or use `DebugLocal` for local iterations: build SecsGemBase first (`dotnet build` in that repo), then rebuild EvenBetterFastSim with `-c DebugLocal`.
 
 There are no automated tests in this project.
 
