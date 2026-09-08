@@ -1,0 +1,102 @@
+<UserControl x:Class="EvenBetterFastSim.WPF.Windows.SecsGemItemView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:viewModels="clr-namespace:EvenBetterFastSim.WPF.ViewModels"
+        mc:Ignorable="d"
+        d:DataContext="{d:DesignInstance Type=viewModels:SecsGemItemViewModel}">
+
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="100" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+
+        <TextBlock Grid.Row="0" Grid.ColumnSpan="3"
+                   Text="Modify Item"
+                   FontSize="16" FontWeight="SemiBold"
+                   Margin="0,0,0,20" />
+
+        <TextBlock Grid.Row="1" Grid.Column="0"
+                   Text="Variable Type" VerticalAlignment="Center"
+                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                   Margin="0,0,12,10" />
+        <ComboBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
+                  Margin="0,0,0,10"
+                  SelectedItem="{Binding SecsGemItemCopy.FormatType}"
+                  ItemsSource="{Binding ItemFormatTypes}" />
+
+        <StackPanel Grid.Row="2" Grid.ColumnSpan="3"
+                    Orientation="Horizontal" Margin="0,0,0,10"
+                    Visibility="{Binding ShowBinaryModeSelector, Converter={StaticResource BoolToVis}}">
+            <TextBlock Text="Binary Input:" VerticalAlignment="Center"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,12,0" />
+            <RadioButton Content="Manual Entry" IsChecked="{Binding IsManualEntry}"
+                         GroupName="BinaryInputMode" Margin="0,0,16,0" />
+            <RadioButton Content="File Upload" IsChecked="{Binding IsFileUploadMode}"
+                         GroupName="BinaryInputMode" />
+        </StackPanel>
+
+        <TextBlock Grid.Row="3" Grid.Column="0"
+                   Text="Value" VerticalAlignment="Center"
+                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                   Margin="0,0,12,10"
+                   Visibility="{Binding ValueVisibility, Converter={StaticResource BoolToVis}, FallbackValue=Visible}" />
+        <TextBox Grid.Row="3" Grid.Column="1"
+                 Margin="0,0,4,10"
+                 MaxHeight="120"
+                 VerticalScrollBarVisibility="Auto"
+                 TextWrapping="Wrap"
+                 Text="{Binding ItemValues, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                 Visibility="{Binding TextBoxVisibility, Converter={StaticResource BoolToVis}, FallbackValue=Visible}" />
+        <TextBlock Grid.Row="3" Grid.Column="1"
+                   Text="{Binding BinaryFileSummary}"
+                   VerticalAlignment="Center"
+                   Margin="0,0,4,10"
+                   Visibility="{Binding FileEntryVisibility, Converter={StaticResource BoolToVis}}" />
+        <Button Grid.Row="3" Grid.Column="2"
+                Content="Upload File" Padding="10,0"
+                Margin="0,0,0,10"
+                Visibility="{Binding FileEntryVisibility, Converter={StaticResource BoolToVis}}"
+                Command="{Binding UploadFileCommand}" />
+
+        <TextBlock Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2"
+                   Text="{Binding BinaryHexError}"
+                   Foreground="#CC3333"
+                   FontSize="11"
+                   Margin="0,-6,4,6"
+                   Visibility="{Binding ShowBinaryHexError, Converter={StaticResource BoolToVis}}" />
+
+        <TextBlock Grid.Row="5" Grid.Column="0"
+                   Text="Delimiter" VerticalAlignment="Center"
+                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                   Margin="0,0,12,10"
+                   Visibility="{Binding DelimiterVisibility, Converter={StaticResource BoolToVis}, FallbackValue=Visible}" />
+        <TextBox Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="2"
+                 Margin="0,0,0,10"
+                 Text="{Binding Delimiter, Mode=TwoWay}"
+                 Visibility="{Binding DelimiterVisibility, Converter={StaticResource BoolToVis}, FallbackValue=Visible}" />
+
+        <TextBlock Grid.Row="6" Grid.Column="0"
+                   Text="Description" VerticalAlignment="Center"
+                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                   Margin="0,0,12,0" />
+        <TextBox Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="2"
+                 Text="{Binding SecsGemItemCopy.Description, Mode=TwoWay}" />
+    </Grid>
+</UserControl>

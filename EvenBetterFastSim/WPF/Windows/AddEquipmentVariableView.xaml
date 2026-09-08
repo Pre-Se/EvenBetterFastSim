@@ -1,0 +1,77 @@
+<UserControl x:Class="EvenBetterFastSim.WPF.Windows.AddEquipmentVariableView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:viewModels="clr-namespace:EvenBetterFastSim.WPF.ViewModels"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=viewModels:AddEquipmentVariableViewModel}">
+
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="100" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <TextBlock Grid.Row="0" Grid.ColumnSpan="2"
+                   Text="Add Variable"
+                   FontSize="16" FontWeight="SemiBold"
+                   Margin="0,0,0,20" />
+
+        <TextBlock Grid.Row="1" Grid.Column="0"
+                   Text="Variable ID" VerticalAlignment="Center"
+                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                   Margin="0,0,12,10" />
+        <TextBox Grid.Row="1" Grid.Column="1"
+                 Margin="0,0,0,10"
+                 Text="{Binding Id, Mode=TwoWay}" />
+
+        <TextBlock Grid.Row="2" Grid.Column="0"
+                   Text="Variable Type" VerticalAlignment="Center"
+                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                   Margin="0,0,12,10" />
+        <ComboBox Grid.Row="2" Grid.Column="1"
+                  Margin="0,0,0,10"
+                  SelectedItem="{Binding SecsGemItemCopy.FormatType}"
+                  ItemsSource="{Binding ItemFormatTypes}" />
+
+        <TextBlock Grid.Row="3" Grid.Column="0"
+                   Text="Value" VerticalAlignment="Center"
+                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                   Margin="0,0,12,10"
+                   Visibility="{Binding ValueVisibility, Converter={StaticResource BoolToVis}, FallbackValue=Visible}" />
+        <TextBox Grid.Row="3" Grid.Column="1"
+                 Margin="0,0,0,10"
+                 Text="{Binding ItemValues, Mode=TwoWay}"
+                 Visibility="{Binding ValueVisibility, Converter={StaticResource BoolToVis}, FallbackValue=Visible}" />
+
+        <TextBlock Grid.Row="4" Grid.Column="0"
+                   Text="Delimiter" VerticalAlignment="Center"
+                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                   Margin="0,0,12,10"
+                   Visibility="{Binding DelimiterVisibility, Converter={StaticResource BoolToVis}, FallbackValue=Visible}" />
+        <TextBox Grid.Row="4" Grid.Column="1"
+                 Margin="0,0,0,10"
+                 Text="{Binding Delimiter, Mode=TwoWay}"
+                 Visibility="{Binding DelimiterVisibility, Converter={StaticResource BoolToVis}, FallbackValue=Visible}" />
+
+        <TextBlock Grid.Row="5" Grid.Column="0"
+                   Text="Description" VerticalAlignment="Center"
+                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                   Margin="0,0,12,0" />
+        <TextBox Grid.Row="5" Grid.Column="1"
+                 Text="{Binding SecsGemItemCopy.Description, Mode=TwoWay}" />
+    </Grid>
+</UserControl>
