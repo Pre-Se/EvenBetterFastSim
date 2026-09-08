@@ -1,5 +1,7 @@
 # Patterns and Conventions
 
+Related docs: [dialog_pattern.md](dialog_pattern.md), [secsgembase_library.md](secsgembase_library.md), [SESSION_REFACTORING_LOG.md](../SESSION_REFACTORING_LOG.md), [CLAUDE.md](../CLAUDE.md)
+
 ## No MemberwiseClone
 
 Use `new T() + CopyFrom() + recurse children` for all `Clone()` methods. MemberwiseClone copies the entire `PropertyChanged` invocation list — clones fire `SetName`/`SetHeader` on the original, so Name/Header on the clone never updates.

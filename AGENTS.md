@@ -1,19 +1,22 @@
 # AGENTS.md
 
-See `CLAUDE.md` for detailed architecture, DI wiring, and settings flow.
+See [CLAUDE.md](CLAUDE.md) for detailed architecture, DI wiring, and settings flow.
 
 ## Build
-
-Use the `build-and-verify` skill to build the project.
 
 ```bash
 dotnet build EvenBetterFastSim.sln
 dotnet run --project EvenBetterFastSim/EvenBetterFastSim.csproj
 ```
 
-Configurations: `Debug` (uses NuGet packages from GitLab), `DebugLocal` (uses SecsGemBase DLLs from `%USERPROFILE%\source\repos\SecsGemBase\`), `Release`.
+Configurations: `Debug` and `Release` (use the `SecsGemBase.MessageHandling` / `SecsGemBase.ScenarioEngine` pre-release NuGet packages from nuget.org), `DebugLocal` (uses SecsGemBase DLLs from `%USERPROFILE%\source\repos\SecsGemBase\`).
 
-No tests, no linter, no typecheck.
+No linter, no typecheck. Tests: `EvenBetterFastSim.Tests` (xUnit) — build the app first, then test:
+
+```bash
+dotnet build EvenBetterFastSim.sln -c DebugLocal
+dotnet test EvenBetterFastSim.Tests
+```
 
 ## Where stuff lives
 
@@ -26,20 +29,21 @@ No tests, no linter, no typecheck.
 | XAML windows | `WPF/Windows/` |
 | Event/report/variable mgmt | `WPF/LibraryManager/EventLibraryManager.cs` |
 
+## Docs
+
+- [specification/project_overview.md](specification/project_overview.md) — architecture summary
+- [specification/patterns.md](specification/patterns.md) — coding rules
+- [specification/dialog_pattern.md](specification/dialog_pattern.md) — dialog wiring
+- [specification/secsgembase_library.md](specification/secsgembase_library.md) — SecsGemBase internals
+- [specification/features.md](specification/features.md) — feature log
+- [specification/scenario-system.md](specification/scenario-system.md) — scenario engine reference
+- [specification/scenario-canvas-selection-deletion.md](specification/scenario-canvas-selection-deletion.md) — canvas selection/deletion
+- [SESSION_REFACTORING_LOG.md](SESSION_REFACTORING_LOG.md) — SecsGemItem generic refactor log
+
 ## Gotchas
 
 - **Settings are not written to `appsettings.json`.** Defaults come from `appsettings.json`, runtime edits are saved to `%APPDATA%/EvenBetterFastSim/usersettings.json` only on app close.
 - **Add children via `child.SetParent(parent)`**, never assign `Children` directly.
 - **DebugLocal** needs the SecsGemBase repo built first at `%USERPROFILE%\source\repos\SecsGemBase\`.
-- **Debug** builds pull `SecsGemMessageHandling` and `SecsGemScenarioEngine` from GitLab's NuGet registry. Packages are published by the SecsGemBase CI pipeline on push to master/development.
-- **GitLab NuGet auth**: Add to your user-level NuGet config (NOT the project config):
-  ```bash
-  dotnet nuget add source "http://gitlabserver/api/v4/projects/4/packages/nuget/index.json" --name gitlab --username YOUR_GITLAB_USERNAME --password YOUR_PAT --store-password-in-clear-text --allow-insecure-connections
-  ```
-  Alternatively, create a **project access token** in the SecsGemBase project settings (`Settings > Access Tokens`) with `Developer` role and `read_api` scope. Then use the bot username as shown in members:
-  ```bash
-  dotnet nuget add source "http://gitlabserver/api/v4/projects/4/packages/nuget/index.json" --name gitlab --username project_4_bot_xxx --password YOUR_TOKEN --store-password-in-clear-text --allow-insecure-connections
-  ```
-  Create a PAT at `http://gitlabserver/-/user_settings/personal_access_tokens` with **`api`** scope.
 - **`CopyFrom()`** on settings fires `PropertyChanged` which triggers an automatic connection restart.
 - **Ordering fix**: If SEND/RECEIVE timestamps appear out of order, add (or check for) `.ConfigureAwait(false)` on `await SendDataMessage(...)` in `CommunicationHandler.SendAndLogMessage()` in SecsGemBase. Without it, the SEND timestamp gets captured on the WPF dispatcher instead of immediately after TCP send, and a fast reply can get an earlier timestamp.

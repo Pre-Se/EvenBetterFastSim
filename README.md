@@ -5,6 +5,16 @@ equipment communication. It lets you stand up a fake tool (or host) on your mach
 drive HSMS/SECS-II message exchanges by hand or from scripted scenarios, and watch every
 byte that goes over the wire — without any real equipment.
 
+## Developer docs
+
+- [CLAUDE.md](CLAUDE.md) / [AGENTS.md](AGENTS.md) — build, architecture, DI wiring
+- [specification/](specification/) — architecture standards and patterns:
+  [project overview](specification/project_overview.md), [patterns](specification/patterns.md),
+  [dialog pattern](specification/dialog_pattern.md), [SecsGemBase internals](specification/secsgembase_library.md),
+  [features](specification/features.md), [scenario system](specification/scenario-system.md),
+  [canvas selection/deletion](specification/scenario-canvas-selection-deletion.md)
+- [SESSION_REFACTORING_LOG.md](SESSION_REFACTORING_LOG.md) — SecsGemItem generic refactor log
+
 ## Features
 ----------
 - HSMS (TCP/IP) communication with a live, timestamped message log

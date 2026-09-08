@@ -9,7 +9,6 @@ on:
       - '**/*.md'
       - 'docs/**'
       - 'specification/**'
-      - 'specifications/**'
       - '.obsidian/**'
   workflow_dispatch:
 
