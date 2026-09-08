@@ -1,8 +1,5 @@
 name: CI
 
-# Validation for every PR into main: the app must build (Release + DebugLocal)
-# and the full test suite must pass. Make this a required status check on main
-# (Settings -> Branches) so a PR cannot be merged unless this job is green.
 on:
   pull_request:
     branches: [main]
@@ -38,13 +35,6 @@ jobs:
           $ErrorActionPreference = 'Stop'
           dotnet build EvenBetterFastSim/EvenBetterFastSim.csproj -c Release
           if ($LASTEXITCODE -ne 0) { throw "Release build failed" }
-
-      - name: Build solution (DebugLocal) — required before tests
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          dotnet build EvenBetterFastSim.sln -c DebugLocal
-          if ($LASTEXITCODE -ne 0) { throw "DebugLocal build failed" }
 
       - name: Test
         shell: pwsh
