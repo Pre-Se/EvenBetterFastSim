@@ -1,0 +1,83 @@
+name: Release
+
+# Every push to main builds a self-contained, single-file Windows .exe
+# and publishes it as a GitHub Release asset.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'specification/**'
+      - 'specifications/**'
+      - '.obsidian/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0            # Nerdbank.GitVersioning needs full history
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Compute version (Nerdbank.GitVersioning)
+        id: version
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet tool install --global nbgv --version 3.9.50
+          $env:PATH = "$env:USERPROFILE\.dotnet\tools;$env:PATH"
+          $semver = nbgv get-version --variable SemVer2
+          if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($semver)) { throw "nbgv failed to produce a version" }
+          "semver=$semver"                      >> $env:GITHUB_OUTPUT
+          "tag=v$semver"                        >> $env:GITHUB_OUTPUT
+          "asset=EvenBetterFastSim-$semver.exe" >> $env:GITHUB_OUTPUT
+          Write-Host "Version: $semver"
+
+      - name: Publish single-file exe
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet publish EvenBetterFastSim/EvenBetterFastSim.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true `
+            -p:DebugType=none `
+            -o publish
+          if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed" }
+          Copy-Item publish/EvenBetterFastSim.exe "${{ steps.version.outputs.asset }}"
+
+      - name: Create / update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $tag   = "${{ steps.version.outputs.tag }}"
+          $asset = "${{ steps.version.outputs.asset }}"
+
+          gh release view $tag 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $asset --clobber
+          } else {
+            $ghArgs = @($tag, $asset, '--title', $tag, '--target', '${{ github.sha }}', '--generate-notes')
+            if ("${{ steps.version.outputs.semver }}" -match '-') { $ghArgs += '--prerelease' }
+            gh release create @ghArgs
+          }
