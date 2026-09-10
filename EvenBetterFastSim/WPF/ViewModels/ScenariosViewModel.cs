@@ -29,6 +29,11 @@ public partial class ScenarioListItem : ObservableObject
 {
     [ObservableProperty]
     private string name = "New Scenario";
+
+    /// <summary>Shown as a toggle next to the name — this scenario is looping (restarts after each finish).</summary>
+    [ObservableProperty]
+    private bool isLooping;
+
     public ScenarioGraph Graph { get; set; } = new();
     public string? FilePath { get; set; }
 
@@ -74,10 +79,8 @@ public partial class ScenariosViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(RunScenarioCommand))]
     private bool isRunning;
 
-    /// <summary>When on, the selected scenario restarts from Start every time it finishes.</summary>
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(RunScenarioCommand))]
-    private bool isLooping;
+    /// <summary>The scenario whose per-row Loop toggle is currently on, if any.</summary>
+    private ScenarioListItem? loopingScenario;
 
     public ICommand DisconnectConnectorCommand { get; }
 
@@ -138,9 +141,6 @@ public partial class ScenariosViewModel : ObservableObject
 
     partial void OnSelectedScenarioChanged(ScenarioListItem? value)
     {
-        if (IsLooping)
-            IsLooping = false; // don't keep looping a scenario the user navigated away from
-
         if (value != null)
         {
             if (value.CachedNodes != null && value.CachedConnections != null)
@@ -179,6 +179,11 @@ public partial class ScenariosViewModel : ObservableObject
     private void DeleteScenario()
     {
         if (SelectedScenario == null) return;
+        if (ReferenceEquals(loopingScenario, SelectedScenario))
+        {
+            SelectedScenario.IsLooping = false; // stop its loop before it goes away
+            runCts?.Cancel();
+        }
         var idx = Scenarios.IndexOf(SelectedScenario);
         Scenarios.Remove(SelectedScenario);
         SelectedScenario = Scenarios.Count > 0
@@ -206,7 +211,7 @@ public partial class ScenariosViewModel : ObservableObject
     [ObservableProperty]
     private int runTimeoutSeconds = 30;
 
-    private bool CanRunScenario() => !IsRunning && !IsLooping && SelectedScenario != null;
+    private bool CanRunScenario() => !IsRunning && loopingScenario == null && SelectedScenario != null;
 
     /// <summary>Runs the selected scenario once.</summary>
     [RelayCommand(CanExecute = nameof(CanRunScenario))]
@@ -214,6 +219,33 @@ public partial class ScenariosViewModel : ObservableObject
     {
         if (SelectedScenario is { } scenario)
             await RunOnceAsync(scenario, isLoopIteration: false);
+    }
+
+    /// <summary>Toggles the per-row Loop switch for a scenario. One scenario loops at a time.</summary>
+    [RelayCommand]
+    private void ToggleScenarioLoop(ScenarioListItem? scenario)
+    {
+        if (scenario is null) return;
+
+        if (scenario.IsLooping)
+        {
+            scenario.IsLooping = false;
+            if (ReferenceEquals(loopingScenario, scenario))
+                runCts?.Cancel();
+            return;
+        }
+
+        // Only one loop at a time — stop whatever else is looping.
+        if (loopingScenario is { } other)
+        {
+            other.IsLooping = false;
+            runCts?.Cancel();
+        }
+
+        scenario.IsLooping = true;
+        loopingScenario = scenario;
+        RunScenarioCommand.NotifyCanExecuteChanged();
+        _ = RunLoopAsync(scenario);
     }
 
     /// <summary>One pass of a scenario from Start to End (or failure / cancellation).</summary>
@@ -229,7 +261,11 @@ public partial class ScenariosViewModel : ObservableObject
 
         try
         {
-            var graph = BuildGraphFromCanvas();
+            // Build from the scenario's own canvas so a loop keeps running even while another
+            // scenario is selected; fall back to its stored graph if it hasn't been opened yet.
+            var graph = scenario.CachedNodes is { } cachedNodes && scenario.CachedConnections is { } cachedConnections
+                ? BuildGraphFromCanvas(cachedNodes, cachedConnections)
+                : scenario.Graph;
             scenario.Graph = graph;
 
             if (!isLoopIteration)
@@ -258,44 +294,34 @@ public partial class ScenariosViewModel : ObservableObject
         }
     }
 
-    partial void OnIsLoopingChanged(bool value)
+    private async Task RunLoopAsync(ScenarioListItem scenario)
     {
-        if (value)
-            _ = RunLoopAsync();
-        else
-            runCts?.Cancel(); // stop the in-flight iteration promptly
-    }
-
-    private async Task RunLoopAsync()
-    {
-        if (SelectedScenario is not { } scenario)
-        {
-            IsLooping = false;
-            return;
-        }
-
         // One shared set for the whole loop session: a message the equipment sent once can satisfy
         // only one Receive across all iterations, so a single trigger doesn't re-fire every loop.
         var consumed = new HashSet<global::Logging.Interfaces.ILoggedDataMessage>(ReferenceEqualityComparer.Instance);
 
-        LogInfo($"Loop started for '{scenario.Name}' — it will restart from Start after each finish.");
-        while (IsLooping && ReferenceEquals(SelectedScenario, scenario))
+        LogInfo($"Loop started for '{scenario.Name}' — it restarts from Start after each finish.");
+        while (scenario.IsLooping)
         {
             if (consumed.Count > 1000) consumed.Clear(); // messages older than the ~5 s inbound buffer can't be replayed anyway
             await RunOnceAsync(scenario, isLoopIteration: true, consumed);
-            if (!IsLooping) break;
+            if (!scenario.IsLooping) break;
             try { await Task.Delay(200); } catch { /* ignore */ }
         }
         LogInfo($"Loop stopped for '{scenario.Name}'.");
+
+        if (ReferenceEquals(loopingScenario, scenario))
+            loopingScenario = null;
+        RunScenarioCommand.NotifyCanExecuteChanged();
     }
 
     [RelayCommand]
     private void CancelRun()
     {
-        if (IsLooping)
-            IsLooping = false; // OnIsLoopingChanged cancels the current iteration
-        else
-            runCts?.Cancel();
+        if (loopingScenario is { } scenario)
+            scenario.IsLooping = false; // RunLoopAsync exits after the current iteration
+
+        runCts?.Cancel();
     }
 
     public void Save()
