@@ -16,24 +16,69 @@ public partial class NodeResponderView : UserControl
 
     private void FieldTree_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key is not (Key.Up or Key.Down or Key.Left or Key.Right)) return;
         if (sender is not TreeView tree) return;
 
-        var combo = FindComboBoxAncestor(e.OriginalSource as DependencyObject);
+        if (e.Key == Key.Tab)
+        {
+            if (FindAncestor<TextBox>(e.OriginalSource as DependencyObject) is { } textBox
+                && MoveFocusToNextTextBox(tree, textBox, (Keyboard.Modifiers & ModifierKeys.Shift) != 0))
+            {
+                e.Handled = true;
+            }
+            return;
+        }
+
+        if (e.Key is not (Key.Up or Key.Down or Key.Left or Key.Right)) return;
+
+        var combo = FindAncestor<ComboBox>(e.OriginalSource as DependencyObject);
         if (combo is null || combo.IsDropDownOpen) return;
 
         e.Handled = true;
         MoveTreeSelection(tree, e.Key);
     }
 
-    private static ComboBox? FindComboBoxAncestor(DependencyObject? source)
+    private static T? FindAncestor<T>(DependencyObject? source) where T : DependencyObject
     {
         while (source is not null)
         {
-            if (source is ComboBox combo) return combo;
+            if (source is T match) return match;
             source = VisualTreeHelper.GetParent(source) ?? LogicalTreeHelper.GetParent(source);
         }
         return null;
+    }
+
+    private static bool MoveFocusToNextTextBox(TreeView tree, TextBox current, bool backwards)
+    {
+        var textBoxes = new List<TextBox>();
+        CollectVisibleTextBoxes(tree, textBoxes);
+        textBoxes.Sort((a, b) =>
+            a.TranslatePoint(new Point(0, 0), tree).Y.CompareTo(b.TranslatePoint(new Point(0, 0), tree).Y));
+
+        var index = textBoxes.IndexOf(current);
+        if (index < 0) return false;
+
+        var targetIndex = index + (backwards ? -1 : 1);
+        if (targetIndex < 0 || targetIndex >= textBoxes.Count) return false;
+
+        var next = textBoxes[targetIndex];
+        next.Focus();
+        next.SelectAll();
+        next.BringIntoView();
+        return true;
+    }
+
+    private static void CollectVisibleTextBoxes(DependencyObject root, List<TextBox> result)
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is TextBox textBox && textBox.IsVisible && textBox.IsEnabled && textBox.Focusable)
+            {
+                result.Add(textBox);
+                continue;
+            }
+            CollectVisibleTextBoxes(child, result);
+        }
     }
 
     private static void MoveTreeSelection(TreeView tree, Key key)

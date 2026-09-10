@@ -83,10 +83,6 @@ public partial class ResponderFieldViewModel : ObservableObject
     [ObservableProperty]
     public partial string ConditionValue { get; set; } = string.Empty;
 
-    /// <summary>Value used for this leaf when the editor's "Test" builds a sample incoming message.</summary>
-    [ObservableProperty]
-    public partial string SampleValue { get; set; } = string.Empty;
-
     // --- Response mode -----------------------------------------------------
     [ObservableProperty]
     public partial BindingSourceKind Source { get; set; } = BindingSourceKind.Literal;
@@ -120,13 +116,8 @@ public partial class ResponderFieldViewModel : ObservableObject
         this.parameterLookup = parameterLookup;
 
         InitialLeafValue = IsLeaf ? string.Join(",", item.GetStringValues()) : string.Empty;
-        if (IsLeaf)
-        {
-            if (mode == ResponderFieldMode.Response)
-                StaticValue = InitialLeafValue;
-            else
-                SampleValue = InitialLeafValue;
-        }
+        if (IsLeaf && mode == ResponderFieldMode.Response)
+            StaticValue = InitialLeafValue;
 
         var index = 0;
         foreach (var child in item.Children.OfType<SecsGemItem>())

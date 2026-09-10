@@ -53,9 +53,6 @@ public partial class NodeResponderViewModel : ObservableObject, IBaseViewModel
     private ResponderFieldMode fieldMode;
     private Func<string?, IReadOnlyList<PathOption>>? fieldParameterLookup;
 
-    /// <summary>Bindings mode: cloned message shapes keyed by the Receive node id that captured them.</summary>
-    private readonly Dictionary<string, SecsGemDataMessage> triggerShapes = [];
-
     /// <summary>Bindings mode: selectable parameters per Receive node id.</summary>
     private readonly Dictionary<string, List<PathOption>> parametersByNode = [];
 
@@ -71,13 +68,8 @@ public partial class NodeResponderViewModel : ObservableObject, IBaseViewModel
     /// <summary>First dropdown options — the received messages available on this path.</summary>
     public ObservableCollection<UpstreamMessageOption> SourceMessages { get; } = [];
 
-    public ObservableCollection<SampleInputViewModel> SampleInputs { get; } = [];
-
     public IReadOnlyList<ConditionKind> ConditionKinds { get; } = Enum.GetValues<ConditionKind>();
     public IReadOnlyList<BindingSourceKind> BindingSourceKinds { get; } = Enum.GetValues<BindingSourceKind>();
-
-    [ObservableProperty] public partial string TestResult { get; set; } = string.Empty;
-    public ObservableCollection<ResponderFieldViewModel> TestPreviewFields { get; } = [];
 
     /// <summary>Row selected in the field tree — target for the Add / Duplicate / Delete / Move buttons.</summary>
     [ObservableProperty] public partial ResponderFieldViewModel? SelectedField { get; set; }
@@ -118,7 +110,6 @@ public partial class NodeResponderViewModel : ObservableObject, IBaseViewModel
 
         foreach (var upstream in upstreamMessages)
         {
-            triggerShapes[upstream.NodeId] = upstream.Message;
             SourceMessages.Add(new UpstreamMessageOption(upstream.NodeId, upstream.Label));
 
             var parameters = new List<PathOption>();
@@ -177,8 +168,6 @@ public partial class NodeResponderViewModel : ObservableObject, IBaseViewModel
     private void CollectParameters(ResponderFieldViewModel field, string sourceNodeId, string sourceLabel, List<PathOption> into)
     {
         into.Add(new PathOption(field.Path, $"[{field.Path}]  {field.DisplayLabel}", sourceNodeId));
-        if (field.IsLeaf)
-            SampleInputs.Add(new SampleInputViewModel(sourceNodeId, $"{sourceLabel} · [{field.Path}]", field.Path));
 
         foreach (var child in field.Children)
             CollectParameters(child, sourceNodeId, sourceLabel, into);
@@ -234,48 +223,6 @@ public partial class NodeResponderViewModel : ObservableObject, IBaseViewModel
             foreach (var child in Flatten(field.Children))
                 yield return child;
         }
-    }
-
-    // ---- test preview (Bindings mode) -----------------------------
-
-    [RelayCommand]
-    private void RunTest()
-    {
-        TestPreviewFields.Clear();
-        if (Mode != NodeResponderMode.Bindings || node?.Transaction is null || workingMessage is null)
-        {
-            TestResult = "Nothing to preview.";
-            return;
-        }
-
-        var samples = triggerShapes.ToDictionary(
-            kvp => kvp.Key,
-            kvp => (SecsGemDataMessage)kvp.Value.Clone());
-
-        foreach (var sample in SampleInputs)
-        {
-            if (samples.TryGetValue(sample.SourceNodeId, out var message)
-                && SecsGemItemPath.TryResolve(message, sample.ItemPath, out var item))
-            {
-                item.SetValuesFromStrings(sample.Value.Split(',', StringSplitOptions.RemoveEmptyEntries));
-            }
-        }
-
-        var fallback = samples.Values.LastOrDefault();
-        SecsGemDataMessage? Resolve(string? id) =>
-            id is not null && samples.TryGetValue(id, out var m) ? m : fallback;
-
-        var outgoing = (SecsGemDataMessage)workingMessage.Clone();
-        foreach (var binding in CurrentBindings())
-            binding.Apply(outgoing, Resolve);
-
-        var index = 0;
-        foreach (var item in outgoing.Children.OfType<SecsGemItem>())
-        {
-            TestPreviewFields.Add(new ResponderFieldViewModel(item, index.ToString(), ResponderFieldMode.Response));
-            index++;
-        }
-        TestResult = $"Resolved {node.Transaction.PrimaryMessage.Name}";
     }
 
     private IEnumerable<MatchCondition> CurrentConditions() =>
@@ -534,15 +481,4 @@ public partial class NodeResponderViewModel : ObservableObject, IBaseViewModel
 
     [RelayCommand]
     private void CancelClick() => CloseAction?.Invoke();
-}
-
-/// <summary>An incoming leaf plus a sample value, used by the Bindings-mode "Test" button.</summary>
-public partial class SampleInputViewModel(string sourceNodeId, string label, string itemPath) : ObservableObject
-{
-    public string SourceNodeId { get; } = sourceNodeId;
-    public string Label { get; } = label;
-    public string ItemPath { get; } = itemPath;
-
-    [ObservableProperty]
-    public partial string Value { get; set; } = string.Empty;
 }
