@@ -41,6 +41,8 @@ public class ScenarioNodeDto
     [Key(5)] public bool UseReplyMessage { get; set; }
     [Key(6)] public double X { get; set; }
     [Key(7)] public double Y { get; set; }
+    [Key(8)] public string? MatchConditionsJson { get; set; }
+    [Key(9)] public string? ResponseBindingsJson { get; set; }
 
     public static ScenarioNodeDto From(ScenarioNode n) => new()
     {
@@ -51,7 +53,9 @@ public class ScenarioNodeDto
         TransactionJson = n.TransactionJson,
         UseReplyMessage = n.UseReplyMessage,
         X = n.X,
-        Y = n.Y
+        Y = n.Y,
+        MatchConditionsJson = n.MatchConditionsJson,
+        ResponseBindingsJson = n.ResponseBindingsJson
     };
 
     public ScenarioNode ToModel() => new()
@@ -63,7 +67,9 @@ public class ScenarioNodeDto
         TransactionJson = TransactionJson,
         UseReplyMessage = UseReplyMessage,
         X = X,
-        Y = Y
+        Y = Y,
+        MatchConditionsJson = MatchConditionsJson,
+        ResponseBindingsJson = ResponseBindingsJson
     };
 }
 

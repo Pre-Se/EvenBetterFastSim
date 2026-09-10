@@ -460,6 +460,11 @@
                 <!-- Scenarios -->
                 <Grid Visibility="{Binding IsChecked, ElementName=NavScenarios, Converter={StaticResource BoolToVis}}"
                       DataContext="{Binding ScenariosVm}">
+                    <Grid.InputBindings>
+                        <KeyBinding Key="F5" Command="{Binding RunScenarioCommand}" />
+                        <KeyBinding Key="Escape" Command="{Binding CancelRunCommand}" />
+                        <KeyBinding Key="S" Modifiers="Control" Command="{Binding SaveScenariosCommand}" />
+                    </Grid.InputBindings>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="220" MinWidth="160" />
                         <ColumnDefinition Width="4" />
@@ -484,18 +489,26 @@
                                            Style="{StaticResource ToolbarButtonStyle}" Appearance="Secondary" Margin="0,0,4,0" />
                                 <ui:Button Content="Rename" Command="{Binding RenameScenarioCommand}"
                                            Style="{StaticResource ToolbarButtonStyle}" Appearance="Secondary" Margin="0,0,4,0" />
-                                <ui:Button Content="Save" Command="{Binding SaveScenariosCommand}"
-                                           Style="{StaticResource ToolbarButtonStyle}" Appearance="Secondary" Margin="0,0,4,0" />
                                 <ui:Button Content="Reload" Command="{Binding LoadScenariosCommand}"
                                            Style="{StaticResource ToolbarButtonStyle}" Appearance="Secondary" Margin="0,0,4,0" />
-                                <ui:Button Content="Export" Command="{Binding ExportScenarioCommand}"
+                                <ui:Button Content="Save" Command="{Binding SaveScenariosCommand}"
                                            Style="{StaticResource ToolbarButtonStyle}" Appearance="Secondary" Margin="0,0,4,0" />
-                                <ui:Button Content="Import" Command="{Binding ImportScenarioCommand}"
+                                <ui:Button Content="Save As" Command="{Binding ExportScenarioCommand}"
+                                           Style="{StaticResource ToolbarButtonStyle}" Appearance="Secondary" Margin="0,0,4,0" />
+                                <ui:Button Content="Open" Command="{Binding ImportScenarioCommand}"
                                            Style="{StaticResource ToolbarButtonStyle}" Appearance="Secondary" Margin="0,0,8,0" />
                                 <ui:Button Content="Run" Command="{Binding RunScenarioCommand}"
                                            Style="{StaticResource ToolbarButtonStyle}" Appearance="Primary" Margin="0,0,4,0" />
+                                <ToggleButton Content="Loop" IsChecked="{Binding IsLooping, Mode=TwoWay}"
+                                              Padding="10,4" Margin="0,0,4,0" VerticalAlignment="Center"
+                                              ToolTip="Keep restarting this scenario from Start after it finishes" />
                                 <ui:Button Content="Cancel" Command="{Binding CancelRunCommand}"
-                                           Style="{StaticResource ToolbarButtonStyle}" Appearance="Secondary" />
+                                           Style="{StaticResource ToolbarButtonStyle}" Appearance="Secondary" Margin="0,0,10,0" />
+                                <TextBlock Text="Timeout (s)" VerticalAlignment="Center" Margin="0,0,4,0"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                <TextBox Width="52" VerticalAlignment="Center"
+                                         Text="{Binding RunTimeoutSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="Max seconds per run (0 = wait forever — Receive nodes block until their message arrives or you hit Cancel). Also bounds each loop iteration." />
                             </WrapPanel>
                         </DockPanel>
                     </Border>
@@ -539,6 +552,7 @@
                                               PreviewDragOver="ScenarioCanvas_PreviewDragOver">
                              <nodify:NodifyEditor.InputBindings>
                                  <KeyBinding Key="Delete" Command="{Binding DeleteSelectionCommand}" />
+                                 <KeyBinding Key="Return" Command="{Binding EditSelectedNodeCommand}" />
                              </nodify:NodifyEditor.InputBindings>
                              <nodify:NodifyEditor.ItemContainerStyle>
                                  <Style TargetType="nodify:ItemContainer" BasedOn="{StaticResource {x:Type nodify:ItemContainer}}">
@@ -552,14 +566,69 @@
                                                  Input="{Binding Input}"
                                                  Output="{Binding Output}"
                                                  MinWidth="110">
+                                        <nodify:Node.Style>
+                                            <Style TargetType="nodify:Node" BasedOn="{StaticResource {x:Type nodify:Node}}">
+                                                <!-- Colour-code by role so a chain reads at a glance. -->
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsReceiveNode}" Value="True">
+                                                        <Setter Property="HeaderBrush" Value="#1F6FEB" />
+                                                        <Setter Property="BorderBrush" Value="#1F6FEB" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsSendNode}" Value="True">
+                                                        <Setter Property="HeaderBrush" Value="#2EA043" />
+                                                        <Setter Property="BorderBrush" Value="#2EA043" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Type}" Value="Start">
+                                                        <Setter Property="HeaderBrush" Value="#6E7681" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Type}" Value="End">
+                                                        <Setter Property="HeaderBrush" Value="#6E7681" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Type}" Value="And">
+                                                        <Setter Property="HeaderBrush" Value="#8957E5" />
+                                                        <Setter Property="BorderBrush" Value="#8957E5" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </nodify:Node.Style>
                                         <nodify:Node.Content>
-                                            <Button Command="{Binding ToggleSendModeCommand}"
-                                                    Visibility="{Binding CanToggleMode, Converter={StaticResource BoolToVis}}"
-                                                    Content="{Binding SendModeLabel}"
-                                                    FontSize="9"
-                                                    Padding="4,2"
-                                                    Margin="0,4,0,0"
-                                                    HorizontalAlignment="Center" />
+                                            <StackPanel HorizontalAlignment="Center">
+                                                <Button Command="{Binding ToggleSendModeCommand}"
+                                                        Visibility="{Binding CanToggleMode, Converter={StaticResource BoolToVis}}"
+                                                        Content="{Binding SendModeLabel}"
+                                                        FontSize="9"
+                                                        Padding="4,2"
+                                                        Margin="0,4,0,0"
+                                                        HorizontalAlignment="Center" />
+                                                <TextBlock Text="{Binding ConditionSummary}" FontSize="9" Margin="0,3,0,0"
+                                                           HorizontalAlignment="Center" TextAlignment="Center"
+                                                           Foreground="{DynamicResource SystemAccentColorPrimaryBrush}">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding ConditionSummary}" Value="{x:Null}">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                                <TextBlock Text="{Binding BindingSummary}" FontSize="9" Margin="0,2,0,0"
+                                                           HorizontalAlignment="Center" TextAlignment="Center"
+                                                           Foreground="{DynamicResource SystemAccentColorPrimaryBrush}">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding BindingSummary}" Value="{x:Null}">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </StackPanel>
                                         </nodify:Node.Content>
                                         <nodify:Node.InputConnectorTemplate>
                                             <DataTemplate DataType="{x:Type graph:ConnectorViewModel}">
@@ -649,13 +718,31 @@
                         <Grid Margin="8,6">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
-                            <TextBlock Grid.Row="0" Text="DRAG TO CANVAS"
+
+                            <TextBlock Grid.Row="0" Text="NODES"
+                                       FontSize="10" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Margin="0,0,0,6" />
+                            <WrapPanel Grid.Row="1" Margin="0,0,0,10">
+                                <Border Tag="And"
+                                        MouseLeftButtonDown="NodePaletteChip_MouseLeftButtonDown"
+                                        Background="{DynamicResource SubtleFillColorSecondaryBrush}"
+                                        BorderBrush="#8957E5" BorderThickness="1"
+                                        CornerRadius="4" Padding="10,4" Cursor="Hand"
+                                        ToolTip="Join: continues only when every incoming connection has arrived">
+                                    <TextBlock Text="AND" FontWeight="SemiBold" />
+                                </Border>
+                            </WrapPanel>
+
+                            <TextBlock Grid.Row="2" Text="DRAG TO CANVAS"
                                        FontSize="10" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                        Margin="0,0,0,8" />
-                            <TreeView Grid.Row="1" Name="TransactionLibraryTree"
+                            <TreeView Grid.Row="3" Name="TransactionLibraryTree"
                                       ItemsSource="{Binding AvailableTransactions}"
                                       VirtualizingPanel.IsVirtualizing="True"
                                       VirtualizingPanel.VirtualizationMode="Recycling"
@@ -898,14 +985,17 @@
 
                 <!-- Control state buttons (right) -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <CheckBox Content="Auto-online on connect"
+                              IsChecked="{Binding AutoStartOnline}"
+                              VerticalAlignment="Center" Margin="0,0,12,0"
+                              ToolTip="Automatically request ON-LINE once communications are established after connecting" />
                     <ui:Button Content="Online" Command="{Binding TurnOnlineCommand}"
                                Appearance="Secondary" Margin="0,0,4,0" />
                     <ui:Button Content="Offline" Command="{Binding TurnOfflineCommand}"
                                Appearance="Secondary" Margin="0,0,4,0" />
-                    <ui:Button Content="Local" Command="{Binding TurnLocalCommand}"
-                               Appearance="Secondary" Margin="0,0,4,0" />
-                    <ui:Button Content="Remote" Command="{Binding TurnRemoteCommand}"
-                               Appearance="Secondary" />
+                    <ui:Button Content="{Binding OnlineModeLabel}" Command="{Binding ToggleOnlineModeCommand}"
+                               Appearance="Secondary"
+                               ToolTip="Toggle online substate: Local ↔ Remote" />
                 </StackPanel>
             </Grid>
         </Border>

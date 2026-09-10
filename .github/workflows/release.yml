@@ -43,9 +43,10 @@ jobs:
           $env:PATH = "$env:USERPROFILE\.dotnet\tools;$env:PATH"
           $semver = nbgv get-version --variable SemVer2
           if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($semver)) { throw "nbgv failed to produce a version" }
-          "semver=$semver"                      >> $env:GITHUB_OUTPUT
-          "tag=v$semver"                        >> $env:GITHUB_OUTPUT
-          "asset=EvenBetterFastSim-$semver.exe" >> $env:GITHUB_OUTPUT
+          "semver=$semver"                       >> $env:GITHUB_OUTPUT
+          "tag=v$semver"                         >> $env:GITHUB_OUTPUT
+          "asset=EvenBetterFastSim-$semver.exe"  >> $env:GITHUB_OUTPUT
+          "zipasset=EvenBetterFastSim-$semver.zip" >> $env:GITHUB_OUTPUT
           Write-Host "Version: $semver"
 
       - name: Publish single-file exe
@@ -64,6 +65,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed" }
           Copy-Item publish/EvenBetterFastSim.exe "${{ steps.version.outputs.asset }}"
 
+          # Bundle the exe together with the default library so users get a
+          # working `Library\DefaultLibrary.msgpack` next to the exe.
+          New-Item -ItemType Directory -Force -Path staging/Library | Out-Null
+          Copy-Item publish/EvenBetterFastSim.exe staging/
+          Copy-Item publish/Library/DefaultLibrary.msgpack staging/Library/
+          Compress-Archive -Path staging/* -DestinationPath "${{ steps.version.outputs.zipasset }}"
+          if ($LASTEXITCODE -ne 0) { throw "zip failed" }
+
       - name: Create / update GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -71,12 +80,13 @@ jobs:
         run: |
           $tag   = "${{ steps.version.outputs.tag }}"
           $asset = "${{ steps.version.outputs.asset }}"
+          $zipasset = "${{ steps.version.outputs.zipasset }}"
 
           gh release view $tag 2>$null
           if ($LASTEXITCODE -eq 0) {
-            gh release upload $tag $asset --clobber
+            gh release upload $tag $asset,$zipasset --clobber
           } else {
-            $ghArgs = @($tag, $asset, '--title', $tag, '--target', '${{ github.sha }}', '--generate-notes')
+            $ghArgs = @($tag, $asset, $zipasset, '--title', $tag, '--target', '${{ github.sha }}', '--generate-notes')
             if ("${{ steps.version.outputs.semver }}" -match '-') { $ghArgs += '--prerelease' }
             gh release create @ghArgs
           }

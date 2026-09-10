@@ -98,7 +98,7 @@ public class InstanceProfileStore(ILogger<InstanceProfileStore> logger)
             };
 
             root["HsmsParameters"] ??= DefaultHsmsParameters();
-            root["DefaultLibraryLoadPath"] ??= "Library\\SECSGEM_Library.xml";
+            root["DefaultLibraryLoadPath"] ??= "Library\\DefaultLibrary.msgpack";
 
             // New instances default to sending the HSMS Select.req on connect so they
             // reach the SELECTED state without the user toggling it. Later edits made from

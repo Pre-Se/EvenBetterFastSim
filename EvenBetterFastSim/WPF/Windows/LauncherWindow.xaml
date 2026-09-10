@@ -49,8 +49,13 @@
                      SelectedItem="{Binding SelectedProfile}"
                      HorizontalContentAlignment="Stretch">
                 <ListBox.InputBindings>
-                    <MouseBinding MouseAction="LeftDoubleClick" Command="{Binding LaunchCommand}" />
+                    <KeyBinding Key="Return" Command="{Binding LaunchCommand}" />
                 </ListBox.InputBindings>
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                        <EventSetter Event="MouseDoubleClick" Handler="InstanceItem_MouseDoubleClick" />
+                    </Style>
+                </ListBox.ItemContainerStyle>
                 <ListBox.ItemTemplate>
                     <DataTemplate DataType="{x:Type services:InstanceProfile}">
                         <Grid Margin="4,6">

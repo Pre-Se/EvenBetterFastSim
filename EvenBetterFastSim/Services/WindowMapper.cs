@@ -27,6 +27,7 @@ public class WindowMapper
         RegisterMapping<AddEquipmentVariableViewModel, DialogWindow>();
         RegisterMapping<InspectSecsGemItemViewModel, DialogWindow>();
         RegisterMapping<SecsGemTransactionViewModel, DialogWindow>();
+        RegisterMapping<WPF.ViewModels.Responders.NodeResponderViewModel, DialogWindow>();
     }
 
     /// <summary>

@@ -25,19 +25,55 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
-    <PackageReference Include="xunit" Version="2.9.2" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
   <!-- App + SecsGemBase + their NuGet deps, straight from the app's Release output. -->
   <ItemGroup>
-    <Reference Include="$(AppOut)\*.dll" />
+    <Reference Include="C:\Users\DiegoMoran\source\repos\EvenBetterFastSim\EvenBetterFastSim.Tests\..\EvenBetterFastSim\bin\Release\net10.0-windows7.0\CommunityToolkit.Mvvm.dll" />
+    <Reference Include="C:\Users\DiegoMoran\source\repos\EvenBetterFastSim\EvenBetterFastSim.Tests\..\EvenBetterFastSim\bin\Release\net10.0-windows7.0\EvenBetterFastSim.dll" />
+    <Reference Include="C:\Users\DiegoMoran\source\repos\EvenBetterFastSim\EvenBetterFastSim.Tests\..\EvenBetterFastSim\bin\Release\net10.0-windows7.0\FluentResults.dll" />
+    <Reference Include="C:\Users\DiegoMoran\source\repos\EvenBetterFastSim\EvenBetterFastSim.Tests\..\EvenBetterFastSim\bin\Release\net10.0-windows7.0\Logging.dll" />
+    <Reference Include="C:\Users\DiegoMoran\source\repos\EvenBetterFastSim\EvenBetterFastSim.Tests\..\EvenBetterFastSim\bin\Release\net10.0-windows7.0\MessagePack.Annotations.dll" />
+    <Reference Include="C:\Users\DiegoMoran\source\repos\EvenBetterFastSim\EvenBetterFastSim.Tests\..\EvenBetterFastSim\bin\Release\net10.0-windows7.0\MessagePack.dll" />
+    <Reference Include="C:\Users\DiegoMoran\source\repos\EvenBetterFastSim\EvenBetterFastSim.Tests\..\EvenBetterFastSim\bin\Release\net10.0-windows7.0\Microsoft.Extensions.Configuration.Abstractions.dll" />
+    <Reference Include="C:\Users\DiegoMoran\source\repos\EvenBetterFastSim\EvenBetterFastSim.Tests\..\EvenBetterFastSim\bin\Release\net10.0-windows7.0\Microsoft.Extensions.Configuration.Binder.dll" />
+    <Reference Include="C:\Users\DiegoMoran\source\repos\EvenBetterFastSim\EvenBetterFastSim.Tests\..\EvenBetterFastSim\bin\Release\net10.0-windows7.0\Microsoft.Extensions.Configuration.dll" />
+    <Reference Include="C:\Users\DiegoMoran\source\repos\EvenBetterFastSim\EvenBetterFastSim.Tests\..\EvenBetterFastSim\bin\Release\net10.0-windows7.0\Microsoft.Extensions.Configuration.FileExtensions.dll" />
+    <Reference Include="C:\Users\DiegoMoran\source\repos\EvenBetterFastSim\EvenBetterFastSim.Tests\..\EvenBetterFastSim\bin\Release\net10.0-windows7.0\Microsoft.Extensions.Configuration.Json.dll" />
+    <Reference Include="C:\Users\DiegoMoran\source\repos\EvenBetterFastSim\EvenBetterFastSim.Tests\..\EvenBetterFastSim\bin\Release\net10.0-windows7.0\Microsoft.Extensions.DependencyInjection.Abstractions.dll" />
+    <Reference Include="C:\Users\DiegoMoran\source\repos\EvenBetterFastSim\EvenBetterFastSim.Tests\..\EvenBetterFastSim\bin\Release\net10.0-windows7.0\Microsoft.Extensions.DependencyInjection.dll" />
+    <Reference Include="C:\Users\DiegoMoran\source\repos\EvenBetterFastSim\EvenBetterFastSim.Tests\..\EvenBetterFastSim\bin\Release\net10.0-windows7.0\Microsoft.Extensions.FileProviders.Abstractions.dll" />
+    <Reference Include="C:\Users\DiegoMoran\source\repos\EvenBetterFastSim\EvenBetterFastSim.Tests\..\EvenBetterFastSim\bin\Release\net10.0-windows7.0\Microsoft.Extensions.FileProviders.Physical.dll" />
+    <Reference Include="C:\Users\DiegoMoran\source\repos\EvenBetterFastSim\EvenBetterFastSim.Tests\..\EvenBetterFastSim\bin\Release\net10.0-windows7.0\Microsoft.Extensions.FileSystemGlobbing.dll" />
+    <Reference Include="C:\Users\DiegoMoran\source\repos\EvenBetterFastSim\EvenBetterFastSim.Tests\..\EvenBetterFastSim\bin\Release\net10.0-windows7.0\Microsoft.Extensions.Logging.Abstractions.dll" />
+    <Reference Include="C:\Users\DiegoMoran\source\repos\EvenBetterFastSim\EvenBetterFastSim.Tests\..\EvenBetterFastSim\bin\Release\net10.0-windows7.0\Microsoft.Extensions.Logging.dll" />
+    <Reference Include="C:\Users\DiegoMoran\source\repos\EvenBetterFastSim\EvenBetterFastSim.Tests\..\EvenBetterFastSim\bin\Release\net10.0-windows7.0\Microsoft.Extensions.Options.dll" />
+    <Reference Include="C:\Users\DiegoMoran\source\repos\EvenBetterFastSim\EvenBetterFastSim.Tests\..\EvenBetterFastSim\bin\Release\net10.0-windows7.0\Microsoft.Extensions.Primitives.dll" />
+    <Reference Include="C:\Users\DiegoMoran\source\repos\EvenBetterFastSim\EvenBetterFastSim.Tests\..\EvenBetterFastSim\bin\Release\net10.0-windows7.0\Microsoft.NET.StringTools.dll" />
+    <Reference Include="C:\Users\DiegoMoran\source\repos\EvenBetterFastSim\EvenBetterFastSim.Tests\..\EvenBetterFastSim\bin\Release\net10.0-windows7.0\Nodify.dll" />
+    <Reference Include="C:\Users\DiegoMoran\source\repos\EvenBetterFastSim\EvenBetterFastSim.Tests\..\EvenBetterFastSim\bin\Release\net10.0-windows7.0\SecsGemBaseItems.dll" />
+    <Reference Include="C:\Users\DiegoMoran\source\repos\EvenBetterFastSim\EvenBetterFastSim.Tests\..\EvenBetterFastSim\bin\Release\net10.0-windows7.0\SecsGemHelperClasses.dll" />
+    <Reference Include="C:\Users\DiegoMoran\source\repos\EvenBetterFastSim\EvenBetterFastSim.Tests\..\EvenBetterFastSim\bin\Release\net10.0-windows7.0\SecsGemMessageHandling.dll" />
+    <Reference Include="C:\Users\DiegoMoran\source\repos\EvenBetterFastSim\EvenBetterFastSim.Tests\..\EvenBetterFastSim\bin\Release\net10.0-windows7.0\SecsGemScenarioEngine.dll" />
+    <Reference Include="C:\Users\DiegoMoran\source\repos\EvenBetterFastSim\EvenBetterFastSim.Tests\..\EvenBetterFastSim\bin\Release\net10.0-windows7.0\System.Reactive.dll" />
+    <Reference Include="C:\Users\DiegoMoran\source\repos\EvenBetterFastSim\EvenBetterFastSim.Tests\..\EvenBetterFastSim\bin\Release\net10.0-windows7.0\TCPIPBaseLibrary.dll" />
+    <Reference Include="C:\Users\DiegoMoran\source\repos\EvenBetterFastSim\EvenBetterFastSim.Tests\..\EvenBetterFastSim\bin\Release\net10.0-windows7.0\Wpf.Ui.Abstractions.dll" />
+    <Reference Include="C:\Users\DiegoMoran\source\repos\EvenBetterFastSim\EvenBetterFastSim.Tests\..\EvenBetterFastSim\bin\Release\net10.0-windows7.0\Wpf.Ui.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Update="DotNet.ReproducibleBuilds" Version="2.0.5" />
+    <PackageReference Update="Microsoft.SourceLink.GitHub" Version="10.0.401" />
+    <PackageReference Update="Nerdbank.GitVersioning" Version="3.10.94" />
   </ItemGroup>
 
   <Target Name="EnsureAppIsBuilt" BeforeTargets="ResolveAssemblyReferences">
-    <Error Condition="!Exists('$(AppOut)\EvenBetterFastSim.dll')"
-           Text="App Release output not found at '$(AppOut)'. Build it first: dotnet build EvenBetterFastSim/EvenBetterFastSim.csproj -c Release" />
+    <Error Condition="!Exists('$(AppOut)\EvenBetterFastSim.dll')" Text="App Release output not found at '$(AppOut)'. Build it first: dotnet build EvenBetterFastSim/EvenBetterFastSim.csproj -c Release" />
   </Target>
 
 </Project>

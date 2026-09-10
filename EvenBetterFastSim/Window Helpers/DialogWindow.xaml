@@ -6,6 +6,7 @@
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         xmlns:windows="clr-namespace:EvenBetterFastSim.WPF.Windows"
         xmlns:viewModels="clr-namespace:EvenBetterFastSim.WPF.ViewModels"
+        xmlns:responders="clr-namespace:EvenBetterFastSim.WPF.ViewModels.Responders"
         mc:Ignorable="d"
         Height="540" Width="600"
         MinWidth="400" MinHeight="300">
@@ -37,6 +38,9 @@
         </DataTemplate>
         <DataTemplate DataType="{x:Type viewModels:SecsGemTransactionViewModel}">
             <windows:SecsGemTransactionView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type responders:NodeResponderViewModel}">
+            <windows:NodeResponderView />
         </DataTemplate>
     </Window.Resources>
 

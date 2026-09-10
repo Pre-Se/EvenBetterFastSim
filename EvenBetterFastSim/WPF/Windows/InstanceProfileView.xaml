@@ -20,6 +20,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="140" />
@@ -60,5 +61,11 @@
                   ItemsSource="{Binding ConnectionModeValues}"
                   SelectedValue="{Binding ConnectionMode}"
                   Visibility="{Binding ShowConnectionMode, Converter={StaticResource BoolToVis}}" />
+
+        <CheckBox Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2"
+                  Margin="0,14,0,0"
+                  Content="{Binding LaunchAfterCreateLabel}"
+                  IsChecked="{Binding LaunchAfterCreate, Mode=TwoWay}"
+                  Visibility="{Binding ShowLaunchAfterCreate, Converter={StaticResource BoolToVis}}" />
     </Grid>
 </UserControl>

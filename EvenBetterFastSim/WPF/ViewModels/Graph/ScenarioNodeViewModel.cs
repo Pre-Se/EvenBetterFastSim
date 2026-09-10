@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SecsGemBaseItems.Data_Containers;
 using SecsGemBaseItems.Data_Containers.Serialization;
+using SecsGemBaseItems.Responders;
 using SecsGemScenarioEngine.Models;
 
 namespace EvenBetterFastSim.WPF.ViewModels.Graph;
@@ -31,9 +32,46 @@ public partial class ScenarioNodeViewModel : ObservableObject
     [ObservableProperty]
     public partial bool UseReplyMessage { get; set; }
 
+    /// <summary>Receive node: serialized <c>List&lt;MatchCondition&gt;</c> that gates the trigger.</summary>
+    [ObservableProperty]
+    public partial string? MatchConditionsJson { get; set; }
+
+    /// <summary>Send node: serialized <c>List&lt;ValueBinding&gt;</c> filled from the upstream Receive.</summary>
+    [ObservableProperty]
+    public partial string? ResponseBindingsJson { get; set; }
+
     public SecsGemTransaction? Transaction { get; set; }
 
+    public string? ConditionSummary
+    {
+        get
+        {
+            var conditions = ResponderJson.DeserializeConditions(MatchConditionsJson);
+            return conditions.Count == 0 ? null
+                : conditions.Count == 1 ? conditions[0].ToString()
+                : $"{conditions[0]}  (+{conditions.Count - 1})";
+        }
+    }
+
+    public string? BindingSummary
+    {
+        get
+        {
+            var count = ResponderJson.DeserializeBindings(ResponseBindingsJson).Count;
+            return count == 0 ? null : $"↩ {count} bound";
+        }
+    }
+
+    partial void OnMatchConditionsJsonChanged(string? value) => OnPropertyChanged(nameof(ConditionSummary));
+    partial void OnResponseBindingsJsonChanged(string? value) => OnPropertyChanged(nameof(BindingSummary));
+
     public bool CanToggleMode => Type is NodeType.Send or NodeType.SendAndWait or NodeType.Receive;
+
+    /// <summary>Receive node — can carry match conditions on the incoming message.</summary>
+    public bool IsReceiveNode => Type is NodeType.Receive;
+
+    /// <summary>Send node — can carry value bindings for its outgoing message.</summary>
+    public bool IsSendNode => Type is NodeType.Send or NodeType.SendAndWait;
 
     public string SendModeLabel => Type switch
     {
@@ -46,9 +84,15 @@ public partial class ScenarioNodeViewModel : ObservableObject
     public ObservableCollection<ConnectorViewModel> Input { get; } = [];
     public ObservableCollection<ConnectorViewModel> Output { get; } = [];
 
+    /// <summary>Start and End are structural — they can't be deleted from the canvas.</summary>
+    public bool IsDeletable => Type is not (NodeType.Start or NodeType.End);
+
     public ScenarioNodeViewModel()
     {
         InitializeConnectors();
+        // Type defaults to Start (enum 0), so OnTypeChanged never fires for a Start node —
+        // set the title explicitly here or it renders with an empty header.
+        UpdateTitleFromType();
     }
 
     partial void OnTypeChanged(NodeType value)
@@ -57,6 +101,9 @@ public partial class ScenarioNodeViewModel : ObservableObject
         UpdateTitleFromType();
         OnPropertyChanged(nameof(CanToggleMode));
         OnPropertyChanged(nameof(SendModeLabel));
+        OnPropertyChanged(nameof(IsReceiveNode));
+        OnPropertyChanged(nameof(IsSendNode));
+        OnPropertyChanged(nameof(IsDeletable));
     }
 
     [RelayCommand]
@@ -91,6 +138,7 @@ public partial class ScenarioNodeViewModel : ObservableObject
             NodeType.SendAndWait => ["Success", "Failure"],
             NodeType.Receive     => ["Success", "Failure"],
             NodeType.Condition   => ["YES", "NO"],
+            NodeType.And         => ["Out"],
             _                    => ["Done"],
         };
 
@@ -125,6 +173,7 @@ public partial class ScenarioNodeViewModel : ObservableObject
             NodeType.Condition => label ?? "If",
             NodeType.Wait => label ?? "Wait",
             NodeType.Receive => label ?? "Receive",
+            NodeType.And => "AND",
             _ => label ?? Type.ToString()
         };
     }
@@ -141,6 +190,8 @@ public partial class ScenarioNodeViewModel : ObservableObject
                 ? SecsGemTransactionJsonConverter.Serialize(Transaction)
                 : null,
             UseReplyMessage = UseReplyMessage,
+            MatchConditionsJson = MatchConditionsJson,
+            ResponseBindingsJson = ResponseBindingsJson,
             X = Location.X,
             Y = Location.Y
         };
@@ -155,6 +206,8 @@ public partial class ScenarioNodeViewModel : ObservableObject
             TransactionName = node.TransactionName,
             DisplayName = node.DisplayName,
             UseReplyMessage = node.UseReplyMessage,
+            MatchConditionsJson = node.MatchConditionsJson,
+            ResponseBindingsJson = node.ResponseBindingsJson,
             Location = new Point(node.X, node.Y)
         };
 

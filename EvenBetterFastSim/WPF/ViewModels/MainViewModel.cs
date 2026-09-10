@@ -149,6 +149,8 @@ public partial class MainViewModel : ObservableObject, IBaseViewModel
         // Subscribe to PropertyChanged event to update commands when the selected item changes
         LibraryManager.PropertyChanged += UpdateSelectedItemChanged;
         MessageHandler.PropertyChanged += UpdateConnectionStatusChanged;
+        DataMessageHandler.PropertyChanged += OnCommunicationsEstablishedChanged;
+        ControlStateInfo.PropertyChanged += OnControlSubstateChanged;
 
         ConfigureSecsGemLogger(secsMessageLogger);
         ModelViewModelMapper = modelViewModelMapper;
@@ -447,23 +449,45 @@ public partial class MainViewModel : ObservableObject, IBaseViewModel
     {
         return ControlStateInfo.ControlSubstate is not ControlSubstate.EquipmentOffline and not ControlSubstate.AttemptOnline;
     }
+    /// <summary>
+    /// True when the online substate (current or next time the equipment goes online) is Remote.
+    /// Drives the Local/Remote toggle button.
+    /// </summary>
+    public bool IsOnlineRemote => ControlStateInfo.OnlineSubstate == ControlSubstate.OnlineRemote;
+
+    /// <summary>Caption for the Local/Remote toggle button.</summary>
+    public string OnlineModeLabel => IsOnlineRemote ? "Remote" : "Local";
+
+    /// <summary>
+    /// Toggles the online substate: Local → Remote → Local. If the equipment is already
+    /// online the change takes effect immediately; otherwise it sets which substate the
+    /// equipment will enter next time it goes online.
+    /// </summary>
     [RelayCommand]
-    private void TurnLocal()
+    private async Task ToggleOnlineMode()
     {
-        ControlStateHandler.TurnLocalSwitch();
+        if (IsOnlineRemote)
+            await ControlStateHandler.TurnLocalSwitch();
+        else
+            await ControlStateHandler.TurnRemoteSwitch();
+
+        OnPropertyChanged(nameof(IsOnlineRemote));
+        OnPropertyChanged(nameof(OnlineModeLabel));
     }
-    private bool CanTurnLocal()
+
+    /// <summary>
+    /// When true, the simulator automatically requests ON-LINE once communications are
+    /// established after connecting. Persisted via <see cref="ApplicationSettings"/>.
+    /// </summary>
+    public bool AutoStartOnline
     {
-        return ControlStateInfo.ControlSubstate == ControlSubstate.OnlineRemote;
-    }
-    [RelayCommand]
-    private void TurnRemote()
-    {
-        ControlStateHandler.TurnRemoteSwitch();
-    }
-    private bool CanTurnRemote()
-    {
-        return ControlStateInfo.ControlSubstate == ControlSubstate.OnlineLocal;
+        get => ApplicationSettings.AutoStartOnline;
+        set
+        {
+            if (ApplicationSettings.AutoStartOnline == value) return;
+            ApplicationSettings.AutoStartOnline = value;
+            OnPropertyChanged();
+        }
     }
 
     private void UpdateSelectedItemChanged(object? o, PropertyChangedEventArgs e)
@@ -484,7 +508,24 @@ public partial class MainViewModel : ObservableObject, IBaseViewModel
     {
         if (e.PropertyName != nameof(MessageHandler.ConnectionStatus)) return;
 
-        ConnectionValues = ConnectionButtonValues.ConnectionButtonValuesMap[MessageHandler.ConnectionStatus]; 
+        ConnectionValues = ConnectionButtonValues.ConnectionButtonValuesMap[MessageHandler.ConnectionStatus];
+    }
+
+    private void OnCommunicationsEstablishedChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(DataMessageHandler.CommunicationsEstablished)) return;
+        if (!DataMessageHandler.CommunicationsEstablished || !AutoStartOnline) return;
+
+        // TurnOnlineSwitch is a no-op unless the equipment is currently offline.
+        _ = ControlStateHandler.TurnOnlineSwitch();
+    }
+
+    private void OnControlSubstateChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(ControlStateInfo.ControlSubstate)) return;
+
+        OnPropertyChanged(nameof(IsOnlineRemote));
+        OnPropertyChanged(nameof(OnlineModeLabel));
     }
 
     private void ConfigureSecsGemLogger(ISecsMessageLogger logger)
