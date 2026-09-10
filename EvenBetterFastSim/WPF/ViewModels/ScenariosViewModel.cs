@@ -207,11 +207,11 @@ public partial class ScenariosViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Overall per-run deadline in seconds; <c>0</c> = wait indefinitely (Receive nodes block until their
-    /// message arrives or the run is cancelled). Also bounds each loop iteration.
+    /// Overall per-run deadline in seconds. Default <c>0</c> = wait indefinitely (Receive nodes block
+    /// until their message arrives, or the run is cancelled). A positive value caps each run / loop iteration.
     /// </summary>
     [ObservableProperty]
-    private int runTimeoutSeconds = 30;
+    private int runTimeoutSeconds;
 
     private bool CanRunScenario() => SelectedScenario is { } s && !activeRuns.ContainsKey(s);
 

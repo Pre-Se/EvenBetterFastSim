@@ -418,6 +418,10 @@ public partial class MainViewModel : ObservableObject, IBaseViewModel
             LibraryMessagePackService.Save(path, SecsGemMessageLibrary);
         else
             LibraryXmlExportService.Save(path, SecsGemMessageLibrary);
+
+        // Remember the just-saved file so this instance re-opens it on next launch
+        // instead of the previously loaded library (persisted on window close).
+        ApplicationSettings.DefaultLibraryLoadPath = path;
     }
 
     [RelayCommand]
