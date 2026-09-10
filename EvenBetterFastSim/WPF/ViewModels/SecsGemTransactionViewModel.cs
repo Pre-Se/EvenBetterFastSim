@@ -10,6 +10,7 @@ namespace EvenBetterFastSim.WPF.ViewModels;
 public partial class SecsGemTransactionViewModel : ObservableObject, IBaseViewModel
 {
     public Action? CloseAction { get; set; }
+    public string HeaderText => "Modify Transaction";
 
     [ObservableProperty]
     private SecsGemTransaction transactionCopy = new();

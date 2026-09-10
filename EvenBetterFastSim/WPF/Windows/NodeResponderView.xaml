@@ -105,6 +105,8 @@
             <!-- Stretch the item + its header so the whole row width is a selection hitbox, not just the controls -->
             <Setter Property="HorizontalAlignment" Value="Stretch" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <!-- Child levels virtualize too (the value inherits, but the TreeViewItem style trigger reads it directly) -->
+            <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True" />
         </Style>
     </UserControl.Resources>
 
@@ -122,8 +124,7 @@
             <KeyBinding Key="Down" Modifiers="Alt" Command="{Binding MoveItemDownCommand}" />
         </Grid.InputBindings>
 
-        <TextBlock Grid.Row="0" Text="{Binding HeaderText}" FontSize="16" FontWeight="SemiBold" />
-        <TextBlock Grid.Row="1" Text="{Binding SubtitleText}" TextWrapping="Wrap" Margin="0,4,0,10"
+        <TextBlock Grid.Row="1" Text="{Binding SubtitleText}" TextWrapping="Wrap" Margin="0,0,0,10"
                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
 
         <!-- Message-editing toolbar: operates on the row selected in the tree below -->
@@ -145,6 +146,7 @@
                           ItemContainerStyle="{StaticResource ExpandedItem}"
                           ItemTemplate="{StaticResource ConditionRow}"
                           HorizontalContentAlignment="Stretch"
+                          VirtualizingPanel.IsVirtualizing="True"
                           ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                           PreviewKeyDown="FieldTree_PreviewKeyDown"
                           behaviors:EventToCommandAdaptor.TreeViewSelectedItem="{Binding SelectedField, Mode=TwoWay}"
@@ -153,6 +155,7 @@
                           ItemContainerStyle="{StaticResource ExpandedItem}"
                           ItemTemplate="{StaticResource BindingRow}"
                           HorizontalContentAlignment="Stretch"
+                          VirtualizingPanel.IsVirtualizing="True"
                           ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                           PreviewKeyDown="FieldTree_PreviewKeyDown"
                           behaviors:EventToCommandAdaptor.TreeViewSelectedItem="{Binding SelectedField, Mode=TwoWay}"

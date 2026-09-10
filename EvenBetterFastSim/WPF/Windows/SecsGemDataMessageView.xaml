@@ -23,11 +23,6 @@
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <TextBlock Grid.Row="0" Grid.ColumnSpan="4"
-                   Text="Modify Data Message"
-                   FontSize="16" FontWeight="SemiBold"
-                   Margin="0,0,0,20" />
-
         <TextBlock Grid.Row="1" Grid.Column="0"
                    Text="Stream" VerticalAlignment="Center"
                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"

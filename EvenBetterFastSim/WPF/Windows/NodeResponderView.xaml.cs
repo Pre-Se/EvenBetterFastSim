@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
@@ -47,6 +48,29 @@ public partial class NodeResponderView : UserControl
         return null;
     }
 
+    /// <summary>
+    /// Moves the selection by re-issuing the arrow key with the selected TreeViewItem focused, so the
+    /// TreeView's own keyboard navigation handles it — including virtualization (unrealized rows are
+    /// realized and scrolled into view) and Left/Right expand/collapse semantics.
+    /// </summary>
+    private static void MoveTreeSelection(TreeView tree, Key key)
+    {
+        if (tree.SelectedItem is null) return;
+
+        var container = FindContainer(tree, tree.SelectedItem);
+        if (container is null) return;
+
+        container.Focus();
+
+        if (PresentationSource.FromVisual(tree) is not { } source) return;
+
+        var keyEventArgs = new KeyEventArgs(Keyboard.PrimaryDevice, source, Environment.TickCount, key)
+        {
+            RoutedEvent = Keyboard.KeyDownEvent
+        };
+        InputManager.Current.ProcessInput(keyEventArgs);
+    }
+
     private static bool MoveFocusToNextTextBox(TreeView tree, TextBox current, bool backwards)
     {
         var textBoxes = new List<TextBox>();
@@ -79,72 +103,6 @@ public partial class NodeResponderView : UserControl
             }
             CollectVisibleTextBoxes(child, result);
         }
-    }
-
-    private static void MoveTreeSelection(TreeView tree, Key key)
-    {
-        if (tree.SelectedItem is not ResponderFieldViewModel selected) return;
-
-        var flat = new List<ResponderFieldViewModel>();
-        var parents = new Dictionary<ResponderFieldViewModel, ResponderFieldViewModel?>();
-        foreach (var root in (IEnumerable<ResponderFieldViewModel>?)tree.ItemsSource ?? [])
-            Flatten(root, null, flat, parents);
-
-        var index = flat.IndexOf(selected);
-        if (index < 0) return;
-
-        var container = FindContainer(tree, selected);
-
-        switch (key)
-        {
-            case Key.Up:
-                SelectItem(tree, flat, index - 1);
-                break;
-            case Key.Down:
-                SelectItem(tree, flat, index + 1);
-                break;
-            case Key.Left:
-                if (container is { HasItems: true, IsExpanded: true })
-                {
-                    container.IsExpanded = false;
-                    return;
-                }
-                if (parents.TryGetValue(selected, out var parent) && parent is not null)
-                    SelectItem(tree, flat, flat.IndexOf(parent));
-                break;
-            case Key.Right:
-                if (container is { HasItems: true } && !container.IsExpanded)
-                {
-                    container.IsExpanded = true;
-                    return;
-                }
-                SelectItem(tree, flat, index + 1);
-                break;
-        }
-    }
-
-    private static void SelectItem(TreeView tree, List<ResponderFieldViewModel> flat, int index)
-    {
-        if (index < 0 || index >= flat.Count) return;
-
-        if (FindContainer(tree, flat[index]) is { } container)
-        {
-            container.IsSelected = true;
-            container.Focus();
-            container.BringIntoView();
-        }
-    }
-
-    private static void Flatten(
-        ResponderFieldViewModel node,
-        ResponderFieldViewModel? parent,
-        List<ResponderFieldViewModel> flat,
-        Dictionary<ResponderFieldViewModel, ResponderFieldViewModel?> parents)
-    {
-        flat.Add(node);
-        parents[node] = parent;
-        foreach (var child in node.Children)
-            Flatten(child, node, flat, parents);
     }
 
     private static TreeViewItem? FindContainer(ItemsControl parent, object item)

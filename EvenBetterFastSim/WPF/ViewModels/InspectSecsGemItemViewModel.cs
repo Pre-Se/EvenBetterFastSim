@@ -15,6 +15,7 @@ public partial class InspectSecsGemItemViewModel : ObservableObject, IBaseViewMo
     private const int BinaryDisplayMaxBytes = 256;
 
     public Action? CloseAction { get; set; }
+    public string HeaderText => "Item Properties";
 
     [ObservableProperty]
     private SecsGemItem? item;

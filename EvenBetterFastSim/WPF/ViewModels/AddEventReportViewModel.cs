@@ -18,6 +18,7 @@ public partial class AddEventReportViewModel(IRegistry<SecsGemEventReport> event
     public bool IsActive { get; set; }
     public int? SelectedReport { get; set; }
     public Action? CloseAction { get; set; }
+    public string HeaderText => "Add Event";
 
     public void LoadForEdit(SecsGemEventReport item)
     {

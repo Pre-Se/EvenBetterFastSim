@@ -10,6 +10,7 @@ namespace EvenBetterFastSim.WPF.ViewModels;
 public partial class SecsGemDataMessageViewModel : ObservableObject, IBaseViewModel
 {
     public Action? CloseAction { get; set; }
+    public string HeaderText => "Modify Data Message";
 
     /// <summary>
     /// Copy of the <see cref="SecsGemDataMessage"/> to be edited, used so that the values can be reverted if the user cancels the edit

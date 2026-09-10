@@ -15,12 +15,17 @@ public class EventToCommandAdaptor
             new PropertyMetadata(new PropertyChangedCallback(AttachOrRemoveTreeViewSelectedItemChangedEvent))
         );
 
+    /// <summary>Default value that can never collide with a real binding value. Using a non-null sentinel
+    /// (instead of null) guarantees the changed callback fires on the very first binding push — even when the
+    /// source starts as null — so the SelectedItemChanged subscription is always established.</summary>
+    private static readonly object UnboundSentinel = new();
+
     public static readonly DependencyProperty TreeViewSelectedItemProperty =
         DependencyProperty.RegisterAttached(
             "TreeViewSelectedItem",
             typeof(object),
-            typeof(EventToCommandAdaptor),
-            new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault,
+            typeof(EventToCommandAdaptor), // owner type
+            new FrameworkPropertyMetadata(UnboundSentinel, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault,
                 OnTreeViewSelectedItemChanged));
 
     private static readonly HashSet<TreeView> SubscribedTreeViews = [];
