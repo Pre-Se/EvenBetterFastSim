@@ -503,9 +503,14 @@
                                            Style="{StaticResource ToolbarButtonStyle}" Appearance="Secondary" Margin="0,0,10,0" />
                                 <TextBlock Text="Timeout (s)" VerticalAlignment="Center" Margin="0,0,4,0"
                                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                <TextBox Width="52" VerticalAlignment="Center"
+                                <TextBox Width="52" VerticalAlignment="Center" Margin="0,0,10,0"
                                          Text="{Binding RunTimeoutSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                          ToolTip="Max seconds per run (0 = wait forever — Receive nodes block until their message arrives or you hit Cancel). Also bounds each loop iteration." />
+                                <TextBlock Text="Retry (s)" VerticalAlignment="Center" Margin="0,0,4,0"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                <TextBox Width="52" VerticalAlignment="Center"
+                                         Text="{Binding RunRetrySeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="Delay between loop iterations (0 = a brief 200 ms pause). Only applies while a scenario is looping." />
                             </WrapPanel>
                         </DockPanel>
                     </Border>

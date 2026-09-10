@@ -40,6 +40,25 @@ public partial class ResponderFieldViewModel : ObservableObject
     public bool IsList => Item.FormatType == SecsGemItemFormatType.List;
     public bool IsLeaf => !IsList;
 
+    /// <summary>Every SECS/GEM format type, offered in the row's inline format dropdown.</summary>
+    public IReadOnlyList<SecsGemItemFormatType> FormatChoices { get; } = Enum.GetValues<SecsGemItemFormatType>();
+
+    /// <summary>
+    /// The item's format. Two-way bound to the row's dropdown; a change raises
+    /// <see cref="FormatChangeRequested"/> so the owner can swap the underlying item in place.
+    /// </summary>
+    [ObservableProperty]
+    public partial SecsGemItemFormatType Format { get; set; }
+
+    /// <summary>Raised when the user picks a different <see cref="Format"/> for this row.</summary>
+    public event Action<ResponderFieldViewModel>? FormatChangeRequested;
+
+    partial void OnFormatChanged(SecsGemItemFormatType value)
+    {
+        if (value != Item.FormatType)
+            FormatChangeRequested?.Invoke(this);
+    }
+
     /// <summary>Leaf value present in the template when the editor opened (to detect edited literals).</summary>
     public string InitialLeafValue { get; }
 
@@ -97,6 +116,7 @@ public partial class ResponderFieldViewModel : ObservableObject
         Item = item;
         Path = path;
         Mode = mode;
+        Format = item.FormatType;
         this.parameterLookup = parameterLookup;
 
         InitialLeafValue = IsLeaf ? string.Join(",", item.GetStringValues()) : string.Empty;

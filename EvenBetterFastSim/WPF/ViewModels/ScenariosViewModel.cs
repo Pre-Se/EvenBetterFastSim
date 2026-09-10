@@ -213,6 +213,13 @@ public partial class ScenariosViewModel : ObservableObject
     [ObservableProperty]
     private int runTimeoutSeconds;
 
+    /// <summary>
+    /// Delay in seconds between loop iterations ("retry"). Default <c>0</c> = the built-in 200 ms
+    /// breather; a positive value waits that long from the end of one iteration before restarting.
+    /// </summary>
+    [ObservableProperty]
+    private int runRetrySeconds;
+
     private bool CanRunScenario() => SelectedScenario is { } s && !activeRuns.ContainsKey(s);
 
     /// <summary>Runs the selected scenario once.</summary>
@@ -276,7 +283,8 @@ public partial class ScenariosViewModel : ObservableObject
                 if (consumed.Count > 1000) consumed.Clear(); // messages older than the ~5 s inbound buffer can't be replayed anyway
                 await RunOnceAsync(scenario, isLoopIteration: true, consumed, loopCts.Token);
                 if (!scenario.IsLooping || loopCts.IsCancellationRequested) break;
-                try { await Task.Delay(200, loopCts.Token); } catch { /* cancelled */ }
+                var retryDelay = RunRetrySeconds > 0 ? TimeSpan.FromSeconds(RunRetrySeconds) : TimeSpan.FromMilliseconds(200);
+                try { await Task.Delay(retryDelay, loopCts.Token); } catch { /* cancelled */ }
             }
         }
         finally
@@ -329,6 +337,18 @@ public partial class ScenariosViewModel : ObservableObject
                 LogInfo($"Scenario '{scenario.Name}' cancelled by the user{CancelledWhileDetail(result.ErrorMessage)}");
             else
                 LogError($"Scenario '{scenario.Name}' failed: {result.ErrorMessage}");
+
+            // A user cancel/stop isn't a failure: clear the transient run icons (waiting hourglass /
+            // danger triangle) the engine painted on whatever node was mid-flight when the token tripped.
+            if (token.IsCancellationRequested && canvasNodes != null)
+                foreach (var n in canvasNodes)
+                    if (n.RunState is ScenarioNodeRunState.Running
+                        or ScenarioNodeRunState.Waiting
+                        or ScenarioNodeRunState.Failed)
+                    {
+                        n.RunState = ScenarioNodeRunState.Idle;
+                        n.RunDetail = null;
+                    }
         }
         catch (OperationCanceledException)
         {
