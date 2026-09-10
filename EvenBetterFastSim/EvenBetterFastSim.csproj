@@ -45,8 +45,8 @@
 	</ItemGroup>  
 
 	<ItemGroup Condition="'$(Configuration)'!='DebugLocal' OR '$(LocalLibraryExist)'=='false'">
-		<PackageReference Include="SecsGemBase.MessageHandling" Version="1.0.0-build-0016-gec5d584d01" />
-		<PackageReference Include="SecsGemBase.ScenarioEngine" Version="1.0.0-build-0016-gec5d584d01" />
+		<PackageReference Include="SecsGemBase.MessageHandling" Version="1.0.0-build-0018-g333cdae360" />
+		<PackageReference Include="SecsGemBase.ScenarioEngine" Version="1.0.0-build-0018-g333cdae360" />
 	</ItemGroup>
 
 <ItemGroup Condition="'$(Configuration)'=='DebugLocal' AND '$(LocalLibraryExist)'=='true'">

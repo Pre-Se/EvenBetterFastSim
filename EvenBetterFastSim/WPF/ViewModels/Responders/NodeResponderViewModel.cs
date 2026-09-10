@@ -53,9 +53,6 @@ public partial class NodeResponderViewModel : ObservableObject, IBaseViewModel
     private ResponderFieldMode fieldMode;
     private Func<string?, IReadOnlyList<PathOption>>? fieldParameterLookup;
 
-    /// <summary>Bindings mode: cloned message shapes keyed by the Receive node id that captured them.</summary>
-    private readonly Dictionary<string, SecsGemDataMessage> triggerShapes = [];
-
     /// <summary>Bindings mode: selectable parameters per Receive node id.</summary>
     private readonly Dictionary<string, List<PathOption>> parametersByNode = [];
 
@@ -71,13 +68,13 @@ public partial class NodeResponderViewModel : ObservableObject, IBaseViewModel
     /// <summary>First dropdown options — the received messages available on this path.</summary>
     public ObservableCollection<UpstreamMessageOption> SourceMessages { get; } = [];
 
-    public ObservableCollection<SampleInputViewModel> SampleInputs { get; } = [];
-
     public IReadOnlyList<ConditionKind> ConditionKinds { get; } = Enum.GetValues<ConditionKind>();
     public IReadOnlyList<BindingSourceKind> BindingSourceKinds { get; } = Enum.GetValues<BindingSourceKind>();
 
-    [ObservableProperty] public partial string TestResult { get; set; } = string.Empty;
-    public ObservableCollection<ResponderFieldViewModel> TestPreviewFields { get; } = [];
+    /// <summary>Row selected in the field tree — target for the Add / Duplicate / Delete / Move buttons.</summary>
+    [ObservableProperty] public partial ResponderFieldViewModel? SelectedField { get; set; }
+
+    partial void OnSelectedFieldChanged(ResponderFieldViewModel? value) => NotifyStructureCommands();
 
     /// <summary>Row selected in the field tree — target for the Add / Duplicate / Delete / Move buttons.</summary>
     [ObservableProperty] public partial ResponderFieldViewModel? SelectedField { get; set; }
@@ -118,7 +115,6 @@ public partial class NodeResponderViewModel : ObservableObject, IBaseViewModel
 
         foreach (var upstream in upstreamMessages)
         {
-            triggerShapes[upstream.NodeId] = upstream.Message;
             SourceMessages.Add(new UpstreamMessageOption(upstream.NodeId, upstream.Label));
 
             var parameters = new List<PathOption>();
@@ -177,8 +173,6 @@ public partial class NodeResponderViewModel : ObservableObject, IBaseViewModel
     private void CollectParameters(ResponderFieldViewModel field, string sourceNodeId, string sourceLabel, List<PathOption> into)
     {
         into.Add(new PathOption(field.Path, $"[{field.Path}]  {field.DisplayLabel}", sourceNodeId));
-        if (field.IsLeaf)
-            SampleInputs.Add(new SampleInputViewModel(sourceNodeId, $"{sourceLabel} · [{field.Path}]", field.Path));
 
         foreach (var child in field.Children)
             CollectParameters(child, sourceNodeId, sourceLabel, into);
@@ -236,53 +230,223 @@ public partial class NodeResponderViewModel : ObservableObject, IBaseViewModel
         }
     }
 
-    // ---- test preview (Bindings mode) -----------------------------
-
-    [RelayCommand]
-    private void RunTest()
-    {
-        TestPreviewFields.Clear();
-        if (Mode != NodeResponderMode.Bindings || node?.Transaction is null || workingMessage is null)
-        {
-            TestResult = "Nothing to preview.";
-            return;
-        }
-
-        var samples = triggerShapes.ToDictionary(
-            kvp => kvp.Key,
-            kvp => (SecsGemDataMessage)kvp.Value.Clone());
-
-        foreach (var sample in SampleInputs)
-        {
-            if (samples.TryGetValue(sample.SourceNodeId, out var message)
-                && SecsGemItemPath.TryResolve(message, sample.ItemPath, out var item))
-            {
-                item.SetValuesFromStrings(sample.Value.Split(',', StringSplitOptions.RemoveEmptyEntries));
-            }
-        }
-
-        var fallback = samples.Values.LastOrDefault();
-        SecsGemDataMessage? Resolve(string? id) =>
-            id is not null && samples.TryGetValue(id, out var m) ? m : fallback;
-
-        var outgoing = (SecsGemDataMessage)workingMessage.Clone();
-        foreach (var binding in CurrentBindings())
-            binding.Apply(outgoing, Resolve);
-
-        var index = 0;
-        foreach (var item in outgoing.Children.OfType<SecsGemItem>())
-        {
-            TestPreviewFields.Add(new ResponderFieldViewModel(item, index.ToString(), ResponderFieldMode.Response));
-            index++;
-        }
-        TestResult = $"Resolved {node.Transaction.PrimaryMessage.Name}";
-    }
-
     private IEnumerable<MatchCondition> CurrentConditions() =>
         Flatten(Fields).Select(f => f.ToCondition()).OfType<MatchCondition>();
 
     private IEnumerable<ValueBinding> CurrentBindings() =>
         Flatten(Fields).Select(f => f.ToBinding()).OfType<ValueBinding>();
+
+    // ---- structural message editing --------------------------------
+    //
+    // The toolbar in NodeResponderView drives these. Each one mutates `workingMessage`, then
+    // CommitStructuralChange rebuilds the field tree (so positional paths are recomputed) while
+    // carrying the user's in-progress condition / binding edits across by item identity.
+
+    /// <summary>Add Item targets a container: a selected List, or the message body when nothing is selected.</summary>
+    private bool CanAddChildItem() => workingMessage is not null && SelectedField is null or { IsList: true };
+    private bool HasSelectedField() => workingMessage is not null && SelectedField is not null;
+
+    private void NotifyStructureCommands()
+    {
+        AddItemCommand.NotifyCanExecuteChanged();
+        AddSiblingCommand.NotifyCanExecuteChanged();
+        DuplicateItemCommand.NotifyCanExecuteChanged();
+        DeleteItemCommand.NotifyCanExecuteChanged();
+        MoveItemUpCommand.NotifyCanExecuteChanged();
+        MoveItemDownCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>Adds a U1 item as the last child of the selected List (or of the message body).</summary>
+    [RelayCommand(CanExecute = nameof(CanAddChildItem))]
+    private void AddItem()
+    {
+        if (workingMessage is null) return;
+
+        ICanBeParent container = SelectedField is { IsList: true } listField ? listField.Item : workingMessage;
+        var newItem = SecsGemItem.Create(SecsGemItemFormatType.U1);
+        newItem.SetParent(container);
+        CommitStructuralChange(newItem);
+    }
+
+    /// <summary>Adds a U1 item as the next sibling of the selected item.</summary>
+    [RelayCommand(CanExecute = nameof(HasSelectedField))]
+    private void AddSibling()
+    {
+        if (SelectedField is not { } field || ContainerOf(field) is not { } location) return;
+
+        var newItem = SecsGemItem.Create(SecsGemItemFormatType.U1);
+        newItem.SetParent(location.Container);
+        MoveWithin(location.Container, ChildrenOf(location.Container).Count - 1, location.Index + 1);
+        CommitStructuralChange(newItem);
+    }
+
+    [RelayCommand(CanExecute = nameof(HasSelectedField))]
+    private void DuplicateItem()
+    {
+        if (SelectedField is not { } field || ContainerOf(field) is not { } location) return;
+
+        var clone = field.Item.Clone();
+        clone.SetParent(location.Container);
+        MoveWithin(location.Container, ChildrenOf(location.Container).Count - 1, location.Index + 1);
+        CommitStructuralChange(clone);
+    }
+
+    [RelayCommand(CanExecute = nameof(HasSelectedField))]
+    private void DeleteItem()
+    {
+        if (SelectedField is not { } field || ContainerOf(field) is not { } location) return;
+
+        var siblings = ChildrenOf(location.Container);
+        field.Item.SetParent(null);
+        var next = siblings.Count == 0 ? null : siblings[Math.Min(location.Index, siblings.Count - 1)] as SecsGemItem;
+        CommitStructuralChange(next);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanMoveItemUp))]
+    private void MoveItemUp() => MoveSelected(-1);
+
+    private bool CanMoveItemUp() =>
+        SelectedField is { } f && ContainerOf(f) is { } location && location.Index > 0;
+
+    [RelayCommand(CanExecute = nameof(CanMoveItemDown))]
+    private void MoveItemDown() => MoveSelected(+1);
+
+    private bool CanMoveItemDown() =>
+        SelectedField is { } f && ContainerOf(f) is { } location
+        && location.Index < ChildrenOf(location.Container).Count - 1;
+
+    private void MoveSelected(int delta)
+    {
+        if (SelectedField is not { } field || ContainerOf(field) is not { } location) return;
+
+        var target = location.Index + delta;
+        if (target < 0 || target >= ChildrenOf(location.Container).Count) return;
+        MoveWithin(location.Container, location.Index, target);
+        CommitStructuralChange(field.Item);
+    }
+
+    private void OnFieldFormatChangeRequested(ResponderFieldViewModel field)
+    {
+        // The change comes from a ComboBox selection commit; rebuilding Fields synchronously
+        // underneath it upsets the binding pipeline, so hop through the dispatcher when there is one.
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess() == false)
+            ApplyFormatChange(field);
+        else
+            dispatcher.BeginInvoke(() => ApplyFormatChange(field));
+    }
+
+    private void ApplyFormatChange(ResponderFieldViewModel field)
+    {
+        if (workingMessage is null || field.Format == field.Item.FormatType) return;
+        if (ContainerOf(field) is not { } location) return;
+
+        var replacement = SecsGemItem.Create(field.Format);
+        replacement.Description = field.Item.Description;
+        if (field.Format == SecsGemItemFormatType.List)
+        {
+            // Preserve any children when a value item becomes a list.
+            foreach (var child in field.Item.Children.OfType<SecsGemItem>().ToList())
+                child.SetParent(replacement);
+        }
+        else
+        {
+            // Best-effort value carry-over; parsing drops anything the new format can't represent.
+            replacement.SetValuesFromStrings(field.Item.GetStringValues());
+        }
+
+        var siblings = ChildrenOf(location.Container);
+        field.Item.SetParent(null);
+        replacement.SetParent(location.Container);
+        MoveWithin(location.Container, siblings.Count - 1, location.Index);
+        CommitStructuralChange(replacement);
+    }
+
+    /// <summary>The container (message body or a List item) holding a field, plus the field's index in it.</summary>
+    private readonly record struct FieldLocation(ICanBeParent Container, int Index);
+
+    private FieldLocation? ContainerOf(ResponderFieldViewModel field)
+    {
+        if (workingMessage is null) return null;
+
+        var segments = field.Path.Split('.');
+        if (!int.TryParse(segments[^1], out var index)) return null;
+
+        if (segments.Length == 1)
+            return new FieldLocation(workingMessage, index);
+
+        var parentPath = string.Join('.', segments[..^1]);
+        return SecsGemItemPath.TryResolve(workingMessage, parentPath, out var parentItem)
+            ? new FieldLocation(parentItem, index)
+            : null;
+    }
+
+    private static ObservableCollection<IDataItem> ChildrenOf(ICanBeParent container) =>
+        (ObservableCollection<IDataItem>)((IDataItem)container).Children;
+
+    private static void MoveWithin(ICanBeParent container, int from, int to)
+    {
+        var children = ChildrenOf(container);
+        if (from >= 0 && to >= 0 && from < children.Count && to < children.Count && from != to)
+            children.Move(from, to);
+    }
+
+    /// <summary>
+    /// Rebuilds the field tree from the mutated <see cref="workingMessage"/>, re-applies the user's
+    /// pending condition / binding edits (keyed by item identity, stable across the rebuild), and
+    /// re-selects <paramref name="itemToSelect"/>.
+    /// </summary>
+    private void CommitStructuralChange(SecsGemItem? itemToSelect)
+    {
+        structureDirty = true;
+
+        var conditionEdits = new Dictionary<SecsGemItem, (ConditionKind Kind, string Value)>();
+        var bindingEdits = new Dictionary<SecsGemItem, (BindingSourceKind Source, string StaticValue, string? NodeId, string? ParamPath)>();
+        foreach (var field in Flatten(Fields))
+        {
+            if (fieldMode == ResponderFieldMode.Trigger)
+            {
+                if (field.Condition != ConditionKind.Any)
+                    conditionEdits[field.Item] = (field.Condition, field.ConditionValue);
+            }
+            else
+            {
+                bindingEdits[field.Item] =
+                    (field.Source, field.StaticValue, field.SourceMessage?.NodeId, field.SourceParameter?.Path);
+            }
+        }
+
+        BuildFields(workingMessage, fieldMode, fieldParameterLookup);
+
+        foreach (var field in Flatten(Fields))
+        {
+            if (conditionEdits.TryGetValue(field.Item, out var condition))
+            {
+                field.Condition = condition.Kind;
+                field.ConditionValue = condition.Value;
+            }
+
+            if (bindingEdits.TryGetValue(field.Item, out var binding))
+            {
+                field.Source = binding.Source;
+                if (binding.Source == BindingSourceKind.Literal)
+                {
+                    field.StaticValue = binding.StaticValue;
+                }
+                else
+                {
+                    field.SourceMessage = SourceMessages.FirstOrDefault(m => m.NodeId == binding.NodeId)
+                        ?? SourceMessages.FirstOrDefault();
+                    field.SourceParameter = field.AvailableParameters.FirstOrDefault(p => p.Path == binding.ParamPath);
+                }
+            }
+        }
+
+        SelectedField = itemToSelect is null
+            ? null
+            : Flatten(Fields).FirstOrDefault(f => ReferenceEquals(f.Item, itemToSelect));
+        NotifyStructureCommands();
+    }
 
     // ---- structural message editing --------------------------------
     //
@@ -534,15 +698,4 @@ public partial class NodeResponderViewModel : ObservableObject, IBaseViewModel
 
     [RelayCommand]
     private void CancelClick() => CloseAction?.Invoke();
-}
-
-/// <summary>An incoming leaf plus a sample value, used by the Bindings-mode "Test" button.</summary>
-public partial class SampleInputViewModel(string sourceNodeId, string label, string itemPath) : ObservableObject
-{
-    public string SourceNodeId { get; } = sourceNodeId;
-    public string Label { get; } = label;
-    public string ItemPath { get; } = itemPath;
-
-    [ObservableProperty]
-    public partial string Value { get; set; } = string.Empty;
 }

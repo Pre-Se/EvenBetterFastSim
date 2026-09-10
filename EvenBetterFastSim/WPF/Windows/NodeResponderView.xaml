@@ -53,7 +53,7 @@
                              ToolTip="Fixed value for this item"
                              Text="{Binding StaticValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
                         <TextBox.Style>
-                            <Style TargetType="TextBox">
+                            <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
                                 <Setter Property="Visibility" Value="Collapsed" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding Source}" Value="Literal">
@@ -99,7 +99,8 @@
             <TextBlock Text="{Binding DisplayLabel}" />
         </HierarchicalDataTemplate>
 
-        <Style x:Key="ExpandedItem" TargetType="TreeViewItem">
+        <Style x:Key="ExpandedItem" TargetType="TreeViewItem"
+               BasedOn="{StaticResource {x:Type TreeViewItem}}">
             <Setter Property="IsExpanded" Value="True" />
             <!-- Stretch the item + its header so the whole row width is a selection hitbox, not just the controls -->
             <Setter Property="HorizontalAlignment" Value="Stretch" />
@@ -145,6 +146,7 @@
                           ItemTemplate="{StaticResource ConditionRow}"
                           HorizontalContentAlignment="Stretch"
                           ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                          PreviewKeyDown="FieldTree_PreviewKeyDown"
                           behaviors:EventToCommandAdaptor.TreeViewSelectedItem="{Binding SelectedField, Mode=TwoWay}"
                           Visibility="{Binding IsConditions, Converter={StaticResource BoolToVis}}" />
                 <TreeView ItemsSource="{Binding Fields}" BorderThickness="0"
@@ -152,6 +154,7 @@
                           ItemTemplate="{StaticResource BindingRow}"
                           HorizontalContentAlignment="Stretch"
                           ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                          PreviewKeyDown="FieldTree_PreviewKeyDown"
                           behaviors:EventToCommandAdaptor.TreeViewSelectedItem="{Binding SelectedField, Mode=TwoWay}"
                           Visibility="{Binding IsBindings, Converter={StaticResource BoolToVis}}" />
             </Grid>
