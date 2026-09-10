@@ -53,7 +53,7 @@
                              ToolTip="Fixed value for this item"
                              Text="{Binding StaticValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
                         <TextBox.Style>
-                            <Style TargetType="TextBox">
+                            <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
                                 <Setter Property="Visibility" Value="Collapsed" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding Source}" Value="Literal">
