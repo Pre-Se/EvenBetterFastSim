@@ -499,9 +499,6 @@
                                            Style="{StaticResource ToolbarButtonStyle}" Appearance="Secondary" Margin="0,0,8,0" />
                                 <ui:Button Content="Run" Command="{Binding RunScenarioCommand}"
                                            Style="{StaticResource ToolbarButtonStyle}" Appearance="Primary" Margin="0,0,4,0" />
-                                <ToggleButton Content="Loop" IsChecked="{Binding IsLooping, Mode=TwoWay}"
-                                              Padding="10,4" Margin="0,0,4,0" VerticalAlignment="Center"
-                                              ToolTip="Keep restarting this scenario from Start after it finishes" />
                                 <ui:Button Content="Cancel" Command="{Binding CancelRunCommand}"
                                            Style="{StaticResource ToolbarButtonStyle}" Appearance="Secondary" Margin="0,0,10,0" />
                                 <TextBlock Text="Timeout (s)" VerticalAlignment="Center" Margin="0,0,4,0"
@@ -527,8 +524,30 @@
                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                        Margin="0,0,0,8" />
                             <ListBox Grid.Row="1" ItemsSource="{Binding Scenarios}"
-                                     SelectedItem="{Binding SelectedScenario}" DisplayMemberPath="Name"
-                                     BorderThickness="0" Background="Transparent" />
+                                     SelectedItem="{Binding SelectedScenario}"
+                                     HorizontalContentAlignment="Stretch"
+                                     BorderThickness="0" Background="Transparent">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <ToggleButton Grid.Column="1" Content="⟳"
+                                                          Width="22" Height="20" Padding="0" FontSize="12"
+                                                          VerticalAlignment="Center"
+                                                          ToolTip="Loop this scenario (restart from Start after each finish)"
+                                                          IsChecked="{Binding IsLooping, Mode=OneWay}"
+                                                          Command="{Binding DataContext.ToggleScenarioLoopCommand,
+                                                                            RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                                          CommandParameter="{Binding}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
                         </Grid>
                     </Border>
 
