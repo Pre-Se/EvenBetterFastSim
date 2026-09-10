@@ -4,6 +4,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:responders="clr-namespace:EvenBetterFastSim.WPF.ViewModels.Responders"
+             xmlns:behaviors="clr-namespace:EvenBetterFastSim.Helpers"
              d:DataContext="{d:DesignInstance Type=responders:NodeResponderViewModel}"
              mc:Ignorable="d">
 
@@ -14,42 +15,39 @@
         <HierarchicalDataTemplate x:Key="ConditionRow"
                                   DataType="{x:Type responders:ResponderFieldViewModel}"
                                   ItemsSource="{Binding Children}">
-            <Grid Margin="0,2">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="240" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="{Binding DisplayLabel}" VerticalAlignment="Center"
-                           TextTrimming="CharacterEllipsis" />
-                <ComboBox Grid.Column="1" Width="100" Margin="6,0,0,0"
+            <StackPanel Orientation="Horizontal" Margin="0,2" Background="Transparent">
+                <ComboBox Width="90"
+                          ToolTip="Item format — changing it retypes the item in the message"
+                          ItemsSource="{Binding FormatChoices}"
+                          SelectedItem="{Binding Format, Mode=TwoWay}" />
+                <ComboBox Width="100" Margin="6,0,0,0"
                           Visibility="{Binding IsLeaf, Converter={StaticResource BoolToVis}}"
                           ItemsSource="{Binding DataContext.ConditionKinds, RelativeSource={RelativeSource AncestorType=UserControl}}"
                           SelectedItem="{Binding Condition, Mode=TwoWay}" />
-                <TextBox Grid.Column="2" Width="150" Margin="6,0,0,0"
+                <TextBox Width="150" Margin="6,0,0,0"
                          Visibility="{Binding IsLeaf, Converter={StaticResource BoolToVis}}"
                          ToolTip="Value the incoming item must (or must not) equal"
                          Text="{Binding ConditionValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-            </Grid>
+                <TextBlock Text="{Binding Item.Description}" Margin="8,0,0,0" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
         </HierarchicalDataTemplate>
 
         <!-- Response row: fixed value or wired from the received message -->
         <HierarchicalDataTemplate x:Key="BindingRow"
                                   DataType="{x:Type responders:ResponderFieldViewModel}"
                                   ItemsSource="{Binding Children}">
-            <Grid Margin="0,2">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="200" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="{Binding DisplayLabel}" VerticalAlignment="Center"
-                           TextTrimming="CharacterEllipsis" />
-                <ComboBox Grid.Column="1" Width="110" Margin="6,0,0,0"
+            <StackPanel Orientation="Horizontal" Margin="0,2" Background="Transparent">
+                <ComboBox Width="90"
+                          ToolTip="Item format — changing it retypes the item in the message"
+                          ItemsSource="{Binding FormatChoices}"
+                          SelectedItem="{Binding Format, Mode=TwoWay}" />
+                <ComboBox Width="110" Margin="6,0,0,0"
                           Visibility="{Binding IsLeaf, Converter={StaticResource BoolToVis}}"
                           ItemsSource="{Binding DataContext.BindingSourceKinds, RelativeSource={RelativeSource AncestorType=UserControl}}"
                           SelectedItem="{Binding Source, Mode=TwoWay}" />
-                <Grid Grid.Column="2" Margin="6,0,0,0"
+                <Grid Margin="6,0,0,0"
                       Visibility="{Binding IsLeaf, Converter={StaticResource BoolToVis}}">
                     <TextBox Width="330"
                              ToolTip="Fixed value for this item"
@@ -89,7 +87,10 @@
                                   SelectedItem="{Binding SourceParameter, Mode=TwoWay}" />
                     </StackPanel>
                 </Grid>
-            </Grid>
+                <TextBlock Text="{Binding Item.Description}" Margin="8,0,0,0" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
         </HierarchicalDataTemplate>
 
         <HierarchicalDataTemplate x:Key="PreviewRow"
@@ -100,6 +101,9 @@
 
         <Style x:Key="ExpandedItem" TargetType="TreeViewItem">
             <Setter Property="IsExpanded" Value="True" />
+            <!-- Stretch the item + its header so the whole row width is a selection hitbox, not just the controls -->
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         </Style>
     </UserControl.Resources>
 
@@ -107,30 +111,54 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
+
+        <Grid.InputBindings>
+            <KeyBinding Key="Up" Modifiers="Alt" Command="{Binding MoveItemUpCommand}" />
+            <KeyBinding Key="Down" Modifiers="Alt" Command="{Binding MoveItemDownCommand}" />
+        </Grid.InputBindings>
 
         <TextBlock Grid.Row="0" Text="{Binding HeaderText}" FontSize="16" FontWeight="SemiBold" />
         <TextBlock Grid.Row="1" Text="{Binding SubtitleText}" TextWrapping="Wrap" Margin="0,4,0,10"
                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
 
-        <Border Grid.Row="2" BorderThickness="1"
+        <!-- Message-editing toolbar: operates on the row selected in the tree below -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,8">
+            <Button Content="Add Item" Command="{Binding AddItemCommand}" Margin="0,0,4,0" Padding="10,4"
+                    ToolTip="Add a U1 item inside the selected list (or at the end of the message)" />
+            <Button Content="Add Sibling" Command="{Binding AddSiblingCommand}" Margin="0,0,4,0" Padding="10,4"
+                    ToolTip="Add a U1 item after the selected item, at the same level" />
+            <Button Content="Duplicate" Command="{Binding DuplicateItemCommand}" Margin="0,0,4,0" Padding="10,4" />
+            <Button Content="Delete" Command="{Binding DeleteItemCommand}" Margin="0,0,4,0" Padding="10,4" />
+            <Button Content="Up" Command="{Binding MoveItemUpCommand}" Margin="0,0,4,0" Padding="10,4" />
+            <Button Content="Down" Command="{Binding MoveItemDownCommand}" Padding="10,4" />
+        </StackPanel>
+
+        <Border Grid.Row="3" BorderThickness="1"
                 BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}">
             <Grid>
                 <TreeView ItemsSource="{Binding Fields}" BorderThickness="0"
                           ItemContainerStyle="{StaticResource ExpandedItem}"
                           ItemTemplate="{StaticResource ConditionRow}"
+                          HorizontalContentAlignment="Stretch"
+                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                          behaviors:EventToCommandAdaptor.TreeViewSelectedItem="{Binding SelectedField, Mode=TwoWay}"
                           Visibility="{Binding IsConditions, Converter={StaticResource BoolToVis}}" />
                 <TreeView ItemsSource="{Binding Fields}" BorderThickness="0"
                           ItemContainerStyle="{StaticResource ExpandedItem}"
                           ItemTemplate="{StaticResource BindingRow}"
+                          HorizontalContentAlignment="Stretch"
+                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                          behaviors:EventToCommandAdaptor.TreeViewSelectedItem="{Binding SelectedField, Mode=TwoWay}"
                           Visibility="{Binding IsBindings, Converter={StaticResource BoolToVis}}" />
             </Grid>
         </Border>
 
         <!-- Test strip (Bindings mode) -->
-        <Border Grid.Row="3" Margin="0,12,0,0" Padding="10" CornerRadius="4"
+        <Border Grid.Row="4" Margin="0,12,0,0" Padding="10" CornerRadius="4"
                 BorderThickness="1" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
                 Visibility="{Binding IsBindings, Converter={StaticResource BoolToVis}}">
             <Grid>

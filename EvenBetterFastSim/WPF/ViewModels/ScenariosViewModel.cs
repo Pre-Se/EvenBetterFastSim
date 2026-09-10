@@ -52,7 +52,6 @@ public partial class ScenariosViewModel : ObservableObject
     private readonly DataMessageHandler dataMessageHandler;
     private readonly ILogService<LoggedString> logService;
     private readonly ILogger<ScenariosViewModel> logger;
-    private CancellationTokenSource? runCts;
 
     [ObservableProperty]
     private ObservableCollection<ScenarioListItem> scenarios = [];
@@ -75,12 +74,8 @@ public partial class ScenariosViewModel : ObservableObject
     [ObservableProperty]
     private PendingConnectionViewModel pendingConnection = new();
 
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(RunScenarioCommand))]
-    private bool isRunning;
-
-    /// <summary>The scenario whose per-row Loop toggle is currently on, if any.</summary>
-    private ScenarioListItem? loopingScenario;
+    /// <summary>Scenarios currently executing (a one-off run or a loop), each with its own cancellation source.</summary>
+    private readonly Dictionary<ScenarioListItem, CancellationTokenSource> activeRuns = [];
 
     public ICommand DisconnectConnectorCommand { get; }
 
@@ -139,6 +134,17 @@ public partial class ScenariosViewModel : ObservableObject
     private void LogError(string message) =>
         logService.LogMessages.Add(new LoggedString { Level = LogLevel.Error, Message = message });
 
+    /// <summary>
+    /// When a run is cancelled while a Receive/Wait step is still pending, the execution service
+    /// reports that step as a timeout (e.g. "Timed out waiting to receive 'S6F11'"). Turn that into
+    /// a " waiting ..." suffix so the log reads "cancelled by the user waiting to receive 'S6F11'"
+    /// instead of a spurious "failed: Timed out".
+    /// </summary>
+    private static string CancelledWhileDetail(string? errorMessage) =>
+        errorMessage is not null && errorMessage.StartsWith("Timed out waiting", StringComparison.OrdinalIgnoreCase)
+            ? " " + errorMessage["Timed out ".Length..]
+            : string.Empty;
+
     partial void OnSelectedScenarioChanged(ScenarioListItem? value)
     {
         if (value != null)
@@ -179,11 +185,7 @@ public partial class ScenariosViewModel : ObservableObject
     private void DeleteScenario()
     {
         if (SelectedScenario == null) return;
-        if (ReferenceEquals(loopingScenario, SelectedScenario))
-        {
-            SelectedScenario.IsLooping = false; // stop its loop before it goes away
-            runCts?.Cancel();
-        }
+        StopRun(SelectedScenario); // stop any run/loop before it goes away
         var idx = Scenarios.IndexOf(SelectedScenario);
         Scenarios.Remove(SelectedScenario);
         SelectedScenario = Scenarios.Count > 0
@@ -205,23 +207,45 @@ public partial class ScenariosViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Overall per-run deadline in seconds; <c>0</c> = wait indefinitely (Receive nodes block until their
-    /// message arrives or the run is cancelled). Also bounds each loop iteration.
+    /// Overall per-run deadline in seconds. Default <c>0</c> = wait indefinitely (Receive nodes block
+    /// until their message arrives, or the run is cancelled). A positive value caps each run / loop iteration.
     /// </summary>
     [ObservableProperty]
-    private int runTimeoutSeconds = 30;
+    private int runTimeoutSeconds;
 
-    private bool CanRunScenario() => !IsRunning && loopingScenario == null && SelectedScenario != null;
+    /// <summary>
+    /// Delay in seconds between loop iterations ("retry"). Default <c>0</c> = the built-in 200 ms
+    /// breather; a positive value waits that long from the end of one iteration before restarting.
+    /// </summary>
+    [ObservableProperty]
+    private int runRetrySeconds;
+
+    private bool CanRunScenario() => SelectedScenario is { } s && !activeRuns.ContainsKey(s);
 
     /// <summary>Runs the selected scenario once.</summary>
     [RelayCommand(CanExecute = nameof(CanRunScenario))]
     private async Task RunScenario()
     {
-        if (SelectedScenario is { } scenario)
-            await RunOnceAsync(scenario, isLoopIteration: false);
+        if (SelectedScenario is not { } scenario || activeRuns.ContainsKey(scenario)) return;
+
+        using var runCts = new CancellationTokenSource();
+        activeRuns[scenario] = runCts;
+        RunScenarioCommand.NotifyCanExecuteChanged();
+        try
+        {
+            await RunOnceAsync(scenario, isLoopIteration: false, consumed: null, runCts.Token);
+        }
+        finally
+        {
+            activeRuns.Remove(scenario);
+            RunScenarioCommand.NotifyCanExecuteChanged();
+        }
     }
 
-    /// <summary>Toggles the per-row Loop switch for a scenario. One scenario loops at a time.</summary>
+    /// <summary>
+    /// Toggles the per-row Loop switch for a scenario. Any number of scenarios can loop at once —
+    /// they share one SECS connection, so design them to handle non-overlapping message types.
+    /// </summary>
     [RelayCommand]
     private void ToggleScenarioLoop(ScenarioListItem? scenario)
     {
@@ -229,36 +253,56 @@ public partial class ScenariosViewModel : ObservableObject
 
         if (scenario.IsLooping)
         {
-            scenario.IsLooping = false;
-            if (ReferenceEquals(loopingScenario, scenario))
-                runCts?.Cancel();
+            scenario.IsLooping = false; // RunLoopAsync sees this and stops
+            if (activeRuns.TryGetValue(scenario, out var cts))
+                SafeCancel(cts);
             return;
         }
 
-        // Only one loop at a time — stop whatever else is looping.
-        if (loopingScenario is { } other)
-        {
-            other.IsLooping = false;
-            runCts?.Cancel();
-        }
+        if (activeRuns.ContainsKey(scenario)) return; // a one-off run is in progress
 
         scenario.IsLooping = true;
-        loopingScenario = scenario;
-        RunScenarioCommand.NotifyCanExecuteChanged();
         _ = RunLoopAsync(scenario);
+    }
+
+    private async Task RunLoopAsync(ScenarioListItem scenario)
+    {
+        using var loopCts = new CancellationTokenSource();
+        activeRuns[scenario] = loopCts;
+        RunScenarioCommand.NotifyCanExecuteChanged();
+
+        // One shared set for the whole loop session: a message the equipment sent once can satisfy
+        // only one Receive across all iterations, so a single trigger doesn't re-fire every loop.
+        var consumed = new System.Collections.Concurrent.ConcurrentDictionary<global::Logging.Interfaces.ILoggedDataMessage, byte>(ReferenceEqualityComparer.Instance);
+
+        LogInfo($"Loop started for '{scenario.Name}' — it restarts from Start after each finish.");
+        try
+        {
+            while (scenario.IsLooping && !loopCts.IsCancellationRequested)
+            {
+                if (consumed.Count > 1000) consumed.Clear(); // messages older than the ~5 s inbound buffer can't be replayed anyway
+                await RunOnceAsync(scenario, isLoopIteration: true, consumed, loopCts.Token);
+                if (!scenario.IsLooping || loopCts.IsCancellationRequested) break;
+                var retryDelay = RunRetrySeconds > 0 ? TimeSpan.FromSeconds(RunRetrySeconds) : TimeSpan.FromMilliseconds(200);
+                try { await Task.Delay(retryDelay, loopCts.Token); } catch { /* cancelled */ }
+            }
+        }
+        finally
+        {
+            activeRuns.Remove(scenario);
+            scenario.IsLooping = false;
+            RunScenarioCommand.NotifyCanExecuteChanged();
+            LogInfo($"Loop stopped for '{scenario.Name}'.");
+        }
     }
 
     /// <summary>One pass of a scenario from Start to End (or failure / cancellation).</summary>
     private async Task RunOnceAsync(
         ScenarioListItem scenario,
         bool isLoopIteration,
-        HashSet<global::Logging.Interfaces.ILoggedDataMessage>? consumedAcrossRuns = null)
+        System.Collections.Concurrent.ConcurrentDictionary<global::Logging.Interfaces.ILoggedDataMessage, byte>? consumed,
+        CancellationToken token)
     {
-        if (IsRunning) return;
-
-        IsRunning = true;
-        runCts = new CancellationTokenSource();
-
         try
         {
             // Build from the scenario's own canvas so a loop keeps running even while another
@@ -271,57 +315,74 @@ public partial class ScenariosViewModel : ObservableObject
             if (!isLoopIteration)
                 LogInfo($"Starting scenario '{scenario.Name}'...");
 
+            // Canvas feedback: highlight the node currently running / stuck waiting.
+            var canvasNodes = scenario.CachedNodes;
+            if (canvasNodes != null)
+                foreach (var n in canvasNodes) { n.RunState = ScenarioNodeRunState.Idle; n.RunDetail = null; }
+
+            IProgress<ScenarioNodeProgress>? progress = canvasNodes is null ? null
+                : new Progress<ScenarioNodeProgress>(p =>
+                {
+                    if (canvasNodes.FirstOrDefault(n => n.Id == p.NodeId) is not { } vm) return;
+                    vm.RunState = p.State;
+                    vm.RunDetail = p.Detail;
+                });
+
             TimeSpan? deadline = RunTimeoutSeconds > 0 ? TimeSpan.FromSeconds(RunTimeoutSeconds) : null;
-            var result = await scenarioExecutionService.ExecuteAsync(graph, runCts.Token, consumedAcrossRuns, deadline);
+            var result = await scenarioExecutionService.ExecuteAsync(graph, token, consumed, deadline, progress);
 
             if (result.Success)
                 LogInfo($"Scenario '{scenario.Name}' completed ({result.CompletedSteps} steps)");
+            else if (token.IsCancellationRequested)
+                LogInfo($"Scenario '{scenario.Name}' cancelled by the user{CancelledWhileDetail(result.ErrorMessage)}");
             else
                 LogError($"Scenario '{scenario.Name}' failed: {result.ErrorMessage}");
+
+            // A user cancel/stop isn't a failure: clear the transient run icons (waiting hourglass /
+            // danger triangle) the engine painted on whatever node was mid-flight when the token tripped.
+            if (token.IsCancellationRequested && canvasNodes != null)
+                foreach (var n in canvasNodes)
+                    if (n.RunState is ScenarioNodeRunState.Running
+                        or ScenarioNodeRunState.Waiting
+                        or ScenarioNodeRunState.Failed)
+                    {
+                        n.RunState = ScenarioNodeRunState.Idle;
+                        n.RunDetail = null;
+                    }
         }
         catch (OperationCanceledException)
         {
-            LogInfo($"Scenario '{scenario.Name}' cancelled");
+            LogInfo($"Scenario '{scenario.Name}' cancelled by the user");
         }
         catch (Exception ex)
         {
             LogError($"Scenario '{scenario.Name}' errored: {ex.Message}");
         }
-        finally
-        {
-            IsRunning = false;
-            runCts = null;
-        }
     }
 
-    private async Task RunLoopAsync(ScenarioListItem scenario)
+    /// <summary>Stops a scenario's run or loop, if any.</summary>
+    private void StopRun(ScenarioListItem scenario)
     {
-        // One shared set for the whole loop session: a message the equipment sent once can satisfy
-        // only one Receive across all iterations, so a single trigger doesn't re-fire every loop.
-        var consumed = new HashSet<global::Logging.Interfaces.ILoggedDataMessage>(ReferenceEqualityComparer.Instance);
-
-        LogInfo($"Loop started for '{scenario.Name}' — it restarts from Start after each finish.");
-        while (scenario.IsLooping)
-        {
-            if (consumed.Count > 1000) consumed.Clear(); // messages older than the ~5 s inbound buffer can't be replayed anyway
-            await RunOnceAsync(scenario, isLoopIteration: true, consumed);
-            if (!scenario.IsLooping) break;
-            try { await Task.Delay(200); } catch { /* ignore */ }
-        }
-        LogInfo($"Loop stopped for '{scenario.Name}'.");
-
-        if (ReferenceEquals(loopingScenario, scenario))
-            loopingScenario = null;
-        RunScenarioCommand.NotifyCanExecuteChanged();
+        scenario.IsLooping = false;
+        if (activeRuns.TryGetValue(scenario, out var cts))
+            SafeCancel(cts);
     }
 
+    /// <summary>Stops every running / looping scenario.</summary>
     [RelayCommand]
     private void CancelRun()
     {
-        if (loopingScenario is { } scenario)
-            scenario.IsLooping = false; // RunLoopAsync exits after the current iteration
+        foreach (var (scenario, cts) in activeRuns.ToList())
+        {
+            scenario.IsLooping = false;
+            SafeCancel(cts);
+        }
+    }
 
-        runCts?.Cancel();
+    private static void SafeCancel(CancellationTokenSource cts)
+    {
+        try { cts.Cancel(); }
+        catch (ObjectDisposedException) { /* run already finished */ }
     }
 
     public void Save()
@@ -507,7 +568,7 @@ public partial class ScenariosViewModel : ObservableObject
             }
             case NodeType.Send or NodeType.SendAndWait:
             {
-                var upstreams = BuildUpstreamReceives(node);
+                var upstreams = BuildUpstreamMessages(node);
                 var vm = viewModelLocator.GetViewModel<Responders.NodeResponderViewModel>();
                 vm.InitializeForSend(node, upstreams);
                 windowManager.ShowDialog(vm);
@@ -522,42 +583,52 @@ public partial class ScenariosViewModel : ObservableObject
         OpenNodeEditor(SelectedNodes.Count == 1 ? SelectedNodes[0] : null);
 
     /// <summary>
-    /// Walks flow edges backwards from <paramref name="start"/> collecting every Receive node on the
-    /// path (earliest first), each as a value source the response editor can pull parameters from.
+    /// Walks flow edges backwards from <paramref name="start"/> through <b>every</b> incoming branch
+    /// (so a fork joined by an AND contributes all its steps), collecting each Receive <b>and</b> Send
+    /// node as a value source the response editor can pull parameters from.
     /// </summary>
-    private IReadOnlyList<Responders.UpstreamReceive> BuildUpstreamReceives(ScenarioNodeViewModel start)
+    private IReadOnlyList<Responders.UpstreamMessage> BuildUpstreamMessages(ScenarioNodeViewModel start)
     {
-        var receives = new List<ScenarioNodeViewModel>();
-        var visited = new HashSet<string>();
-        var current = start;
+        var sources = new List<ScenarioNodeViewModel>();
+        var visited = new HashSet<string> { start.Id };
+        var queue = new Queue<ScenarioNodeViewModel>();
+        queue.Enqueue(start);
 
-        while (current is not null && visited.Add(current.Id))
+        while (queue.Count > 0)
         {
-            var input = current.Input.FirstOrDefault();
-            if (input is null) break;
-            var connection = Connections.FirstOrDefault(c => c.Target == input);
-            if (connection?.Source is null) break;
-            var previous = FindNodeForConnector(connection.Source);
-            if (previous is null) break;
-            if (previous.Type == NodeType.Receive)
-                receives.Add(previous);
-            current = previous;
+            var node = queue.Dequeue();
+            foreach (var connection in Connections.Where(c => c.Target != null && node.Input.Contains(c.Target)))
+            {
+                if (connection.Source is null) continue;
+                var previous = FindNodeForConnector(connection.Source);
+                if (previous is null || !visited.Add(previous.Id)) continue;
+                if (previous.Type is NodeType.Receive or NodeType.Send or NodeType.SendAndWait)
+                    sources.Add(previous);
+                queue.Enqueue(previous); // keep walking back through every node
+            }
         }
 
-        receives.Reverse(); // chain order
+        // Stable left-to-right order so the picker reads like the canvas.
+        sources.Sort((a, b) => a.Location.X.CompareTo(b.Location.X));
 
-        var result = new List<Responders.UpstreamReceive>();
-        var nameCounts = new Dictionary<string, int>();
-        foreach (var receive in receives)
+        var result = new List<Responders.UpstreamMessage>();
+        var labelCounts = new Dictionary<string, int>();
+        foreach (var src in sources)
         {
-            if (receive.Transaction is null) continue;
-            var source = receive.UseReplyMessage ? receive.Transaction.ReplyMessage : receive.Transaction.PrimaryMessage;
+            if (src.Transaction is null) continue;
 
-            nameCounts.TryGetValue(source.Name, out var seen);
-            nameCounts[source.Name] = seen + 1;
-            var label = seen == 0 ? source.Name : $"{source.Name} #{seen + 1}";
+            var isSend = src.Type is NodeType.Send or NodeType.SendAndWait;
+            var message = src.UseReplyMessage ? src.Transaction.ReplyMessage : src.Transaction.PrimaryMessage;
 
-            result.Add(new Responders.UpstreamReceive(receive.Id, label, (SecsGemDataMessage)source.Clone()));
+            var label = (isSend ? "→ " : "← ") + message.Name;
+            if (!isSend && !string.IsNullOrEmpty(src.ConditionSummary))
+                label += $"  ({src.ConditionSummary})";     // distinguish same-type receives by their condition
+            labelCounts.TryGetValue(label, out var seen);
+            labelCounts[label] = seen + 1;
+            if (seen > 0)
+                label += $" #{seen + 1}";
+
+            result.Add(new Responders.UpstreamMessage(src.Id, label, (SecsGemDataMessage)message.Clone()));
         }
         return result;
     }

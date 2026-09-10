@@ -503,9 +503,14 @@
                                            Style="{StaticResource ToolbarButtonStyle}" Appearance="Secondary" Margin="0,0,10,0" />
                                 <TextBlock Text="Timeout (s)" VerticalAlignment="Center" Margin="0,0,4,0"
                                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                <TextBox Width="52" VerticalAlignment="Center"
+                                <TextBox Width="52" VerticalAlignment="Center" Margin="0,0,10,0"
                                          Text="{Binding RunTimeoutSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                          ToolTip="Max seconds per run (0 = wait forever — Receive nodes block until their message arrives or you hit Cancel). Also bounds each loop iteration." />
+                                <TextBlock Text="Retry (s)" VerticalAlignment="Center" Margin="0,0,4,0"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                <TextBox Width="52" VerticalAlignment="Center"
+                                         Text="{Binding RunRetrySeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="Delay between loop iterations (0 = a brief 200 ms pause). Only applies while a scenario is looping." />
                             </WrapPanel>
                         </DockPanel>
                     </Border>
@@ -581,6 +586,7 @@
                              </nodify:NodifyEditor.ItemContainerStyle>
                             <nodify:NodifyEditor.ItemTemplate>
                                 <DataTemplate DataType="{x:Type graph:ScenarioNodeViewModel}">
+                                  <Grid>
                                     <nodify:Node Header="{Binding Title}"
                                                  Input="{Binding Input}"
                                                  Output="{Binding Output}"
@@ -680,6 +686,29 @@
                                             </DataTemplate>
                                         </nodify:Node.OutputConnectorTemplate>
                                     </nodify:Node>
+
+                                    <!-- Run-status icon, top-left over the header. No text (detail on hover). -->
+                                    <TextBlock HorizontalAlignment="Right" VerticalAlignment="Top" Margin="7,3,0,0"
+                                               FontSize="11" Panel.ZIndex="10" ToolTip="{Binding RunDetail}">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Setter Property="Text" Value="&#x23F3;&#xFE0E;" />
+                                                <Setter Property="Foreground" Value="#FFD666" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding RunState}" Value="Waiting">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding RunState}" Value="Failed">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                        <Setter Property="Text" Value="&#x26A0;&#xFE0E;" />
+                                                        <Setter Property="Foreground" Value="#FF6B6B" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                  </Grid>
                                 </DataTemplate>
                             </nodify:NodifyEditor.ItemTemplate>
                             <nodify:NodifyEditor.ConnectionTemplate>

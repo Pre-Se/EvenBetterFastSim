@@ -2,6 +2,27 @@
 
 Related docs: [project_overview.md](project_overview.md), [secsgembase_library.md](secsgembase_library.md), [dialog_pattern.md](dialog_pattern.md), [SESSION_REFACTORING_LOG.md](../SESSION_REFACTORING_LOG.md)
 
+## Responder panel — edit the message shape
+
+The node responder dialog (`NodeResponderView`, opened by double-click on a Send / Receive node) now has a
+message-editing toolbar above the field tree: **Add Item** (U1 child of the selected list / message body),
+**Add Sibling** (U1 after the selection), **Duplicate**, **Delete**, **Up**, **Down** (also `Alt+Up` /
+`Alt+Down`). Each row is a left-aligned strip whose first control is an inline **format dropdown** that
+retypes the item in place (values carried over best-effort; children preserved when a value item becomes a
+list) — there is no separate text label, the dropdown is the item's identity. Works in both modes — Match
+conditions (Receive) and Response values (Send).
+
+**Files:** `WPF/ViewModels/Responders/NodeResponderViewModel.cs` (`workingMessage` clone, `SelectedField`,
+`AddItem` / `AddSibling` / `DuplicateItem` / `DeleteItem` / `MoveItem*` commands, `ApplyFormatChange`,
+`CommitStructuralChange`), `WPF/ViewModels/Responders/ResponderFieldViewModel.cs` (`Format`, `FormatChoices`,
+`FormatChangeRequested`), `WPF/Windows/NodeResponderView.xaml` (toolbar, per-row format combo, selection
+binding via `EventToCommandAdaptor.TreeViewSelectedItem`).
+
+- Edits mutate a clone; on **OK** the new shape is written back to the node's `Transaction` (Primary, or
+  Reply when `UseReplyMessage`) only if something structural changed, then persisted via `ToModel()` JSON.
+- `BuildFields` wraps `workingMessage` directly (no re-clone) so `SecsGemItem` identity is stable across the
+  tree rebuild — `CommitStructuralChange` uses it to carry pending condition / binding edits over.
+
 ## Inspect received message items
 
 Double-clicking a `SecsGemItem` in the messages log TreeView opens a read-only inspect dialog.
