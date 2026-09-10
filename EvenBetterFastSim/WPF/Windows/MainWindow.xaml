@@ -460,6 +460,11 @@
                 <!-- Scenarios -->
                 <Grid Visibility="{Binding IsChecked, ElementName=NavScenarios, Converter={StaticResource BoolToVis}}"
                       DataContext="{Binding ScenariosVm}">
+                    <Grid.InputBindings>
+                        <KeyBinding Key="F5" Command="{Binding RunScenarioCommand}" />
+                        <KeyBinding Key="Escape" Command="{Binding CancelRunCommand}" />
+                        <KeyBinding Key="S" Modifiers="Control" Command="{Binding SaveScenariosCommand}" />
+                    </Grid.InputBindings>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="220" MinWidth="160" />
                         <ColumnDefinition Width="4" />
@@ -484,13 +489,13 @@
                                            Style="{StaticResource ToolbarButtonStyle}" Appearance="Secondary" Margin="0,0,4,0" />
                                 <ui:Button Content="Rename" Command="{Binding RenameScenarioCommand}"
                                            Style="{StaticResource ToolbarButtonStyle}" Appearance="Secondary" Margin="0,0,4,0" />
-                                <ui:Button Content="Save" Command="{Binding SaveScenariosCommand}"
-                                           Style="{StaticResource ToolbarButtonStyle}" Appearance="Secondary" Margin="0,0,4,0" />
                                 <ui:Button Content="Reload" Command="{Binding LoadScenariosCommand}"
                                            Style="{StaticResource ToolbarButtonStyle}" Appearance="Secondary" Margin="0,0,4,0" />
-                                <ui:Button Content="Export" Command="{Binding ExportScenarioCommand}"
+                                <ui:Button Content="Save" Command="{Binding SaveScenariosCommand}"
                                            Style="{StaticResource ToolbarButtonStyle}" Appearance="Secondary" Margin="0,0,4,0" />
-                                <ui:Button Content="Import" Command="{Binding ImportScenarioCommand}"
+                                <ui:Button Content="Save As" Command="{Binding ExportScenarioCommand}"
+                                           Style="{StaticResource ToolbarButtonStyle}" Appearance="Secondary" Margin="0,0,4,0" />
+                                <ui:Button Content="Open" Command="{Binding ImportScenarioCommand}"
                                            Style="{StaticResource ToolbarButtonStyle}" Appearance="Secondary" Margin="0,0,8,0" />
                                 <ui:Button Content="Run" Command="{Binding RunScenarioCommand}"
                                            Style="{StaticResource ToolbarButtonStyle}" Appearance="Primary" Margin="0,0,4,0" />
@@ -539,6 +544,7 @@
                                               PreviewDragOver="ScenarioCanvas_PreviewDragOver">
                              <nodify:NodifyEditor.InputBindings>
                                  <KeyBinding Key="Delete" Command="{Binding DeleteSelectionCommand}" />
+                                 <KeyBinding Key="Return" Command="{Binding EditSelectedNodeCommand}" />
                              </nodify:NodifyEditor.InputBindings>
                              <nodify:NodifyEditor.ItemContainerStyle>
                                  <Style TargetType="nodify:ItemContainer" BasedOn="{StaticResource {x:Type nodify:ItemContainer}}">
@@ -552,20 +558,27 @@
                                                  Input="{Binding Input}"
                                                  Output="{Binding Output}"
                                                  MinWidth="110">
-                                        <nodify:Node.ContextMenu>
-                                            <ContextMenu>
-                                                <MenuItem Header="Edit match conditions…"
-                                                          Visibility="{Binding IsReceiveNode, Converter={StaticResource BoolToVis}}"
-                                                          Command="{Binding Source={x:Reference MainWin},
-                                                              Path=DataContext.ScenariosVm.EditNodeConditionsCommand}"
-                                                          CommandParameter="{Binding}" />
-                                                <MenuItem Header="Edit response values…"
-                                                          Visibility="{Binding IsSendNode, Converter={StaticResource BoolToVis}}"
-                                                          Command="{Binding Source={x:Reference MainWin},
-                                                              Path=DataContext.ScenariosVm.EditNodeResponseCommand}"
-                                                          CommandParameter="{Binding}" />
-                                            </ContextMenu>
-                                        </nodify:Node.ContextMenu>
+                                        <nodify:Node.Style>
+                                            <Style TargetType="nodify:Node" BasedOn="{StaticResource {x:Type nodify:Node}}">
+                                                <!-- Colour-code by role so a chain reads at a glance. -->
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsReceiveNode}" Value="True">
+                                                        <Setter Property="HeaderBrush" Value="#1F6FEB" />
+                                                        <Setter Property="BorderBrush" Value="#1F6FEB" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsSendNode}" Value="True">
+                                                        <Setter Property="HeaderBrush" Value="#2EA043" />
+                                                        <Setter Property="BorderBrush" Value="#2EA043" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Type}" Value="Start">
+                                                        <Setter Property="HeaderBrush" Value="#6E7681" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Type}" Value="End">
+                                                        <Setter Property="HeaderBrush" Value="#6E7681" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </nodify:Node.Style>
                                         <nodify:Node.Content>
                                             <StackPanel HorizontalAlignment="Center">
                                                 <Button Command="{Binding ToggleSendModeCommand}"

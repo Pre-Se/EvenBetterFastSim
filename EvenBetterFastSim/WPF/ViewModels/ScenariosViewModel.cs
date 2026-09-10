@@ -393,26 +393,37 @@ public partial class ScenariosViewModel : ObservableObject
         LogInfo($"Added '{transaction.Name}' to scenario");
     }
 
-    /// <summary>Opens the match-conditions editor for a Receive node.</summary>
+    /// <summary>
+    /// Opens the editor for a node: match conditions for a Receive node, response values for a
+    /// Send node. Invoked by right-click / double-click / Enter on the canvas.
+    /// </summary>
     [RelayCommand]
-    private void EditNodeConditions(ScenarioNodeViewModel? node)
+    private void OpenNodeEditor(ScenarioNodeViewModel? node)
     {
-        if (node is not { Type: NodeType.Receive }) return;
-        var vm = viewModelLocator.GetViewModel<Responders.NodeResponderViewModel>();
-        vm.InitializeForReceive(node);
-        windowManager.ShowDialog(vm);
+        switch (node?.Type)
+        {
+            case NodeType.Receive:
+            {
+                var vm = viewModelLocator.GetViewModel<Responders.NodeResponderViewModel>();
+                vm.InitializeForReceive(node);
+                windowManager.ShowDialog(vm);
+                break;
+            }
+            case NodeType.Send or NodeType.SendAndWait:
+            {
+                var upstream = FindUpstreamReceive(node);
+                var vm = viewModelLocator.GetViewModel<Responders.NodeResponderViewModel>();
+                vm.InitializeForSend(node, upstream?.Transaction, upstream?.UseReplyMessage ?? false);
+                windowManager.ShowDialog(vm);
+                break;
+            }
+        }
     }
 
-    /// <summary>Opens the response-value editor for a Send node, wired to the nearest upstream Receive.</summary>
+    /// <summary>Opens the editor for the single selected node (bound to the Enter key on the canvas).</summary>
     [RelayCommand]
-    private void EditNodeResponse(ScenarioNodeViewModel? node)
-    {
-        if (node is not { Type: NodeType.Send or NodeType.SendAndWait }) return;
-        var upstream = FindUpstreamReceive(node);
-        var vm = viewModelLocator.GetViewModel<Responders.NodeResponderViewModel>();
-        vm.InitializeForSend(node, upstream?.Transaction, upstream?.UseReplyMessage ?? false);
-        windowManager.ShowDialog(vm);
-    }
+    private void EditSelectedNode() =>
+        OpenNodeEditor(SelectedNodes.Count == 1 ? SelectedNodes[0] : null);
 
     /// <summary>Walks flow edges backwards from <paramref name="start"/> to the first Receive node.</summary>
     private ScenarioNodeViewModel? FindUpstreamReceive(ScenarioNodeViewModel start)
@@ -494,14 +505,24 @@ public partial class ScenariosViewModel : ObservableObject
 
     public void DeleteNodes(IEnumerable<ScenarioNodeViewModel> nodes)
     {
-        foreach (var node in nodes.ToList())
+        var requested = nodes.ToList();
+        var blocked = 0;
+
+        foreach (var node in requested)
         {
-            if (node.Type is NodeType.Start or NodeType.End) continue;
+            if (!node.IsDeletable)
+            {
+                blocked++;
+                continue;
+            }
 
             RemoveConnections(Connections.Where(c =>
                 NodeOwnsConnector(c.Source, node) || NodeOwnsConnector(c.Target, node)).ToList());
             Nodes.Remove(node);
         }
+
+        if (blocked > 0 && blocked == requested.Count)
+            LogInfo("Start and End nodes can't be deleted.");
     }
 
     public void DeleteConnections(IEnumerable<ConnectionViewModel> connections) =>

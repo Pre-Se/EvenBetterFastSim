@@ -4,6 +4,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using EvenBetterFastSim.WPF.ViewModels;
+using EvenBetterFastSim.WPF.ViewModels.Graph;
 using SecsGemBaseItems.Data_Containers;
 using Wpf.Ui.Controls;
 
@@ -26,6 +27,59 @@ public partial class MainWindow
         EventCollectionTreeView.PreviewKeyDown += OnEventDeleteKey;
         ReportCollectionTreeView.PreviewKeyDown += OnReportDeleteKey;
         VariableCollectionTreeView.PreviewKeyDown += OnVariableDeleteKey;
+
+        // Open a scenario node's editor with a single right-click or a left double-click.
+        // Registered handledEventsToo so Nodify's own right-click / selection handling doesn't swallow it.
+        ScenarioCanvas.AddHandler(MouseRightButtonDownEvent,
+            new MouseButtonEventHandler(ScenarioNode_RightButtonDown), handledEventsToo: true);
+        ScenarioCanvas.AddHandler(MouseRightButtonUpEvent,
+            new MouseButtonEventHandler(ScenarioNode_RightButtonUp), handledEventsToo: true);
+        ScenarioCanvas.AddHandler(System.Windows.Controls.Control.MouseDoubleClickEvent,
+            new MouseButtonEventHandler(ScenarioNode_MouseDoubleClick), handledEventsToo: true);
+    }
+
+    private Point scenarioRightDownPoint;
+
+    private void ScenarioNode_RightButtonDown(object sender, MouseButtonEventArgs e) =>
+        scenarioRightDownPoint = e.GetPosition(ScenarioCanvas);
+
+    private void ScenarioNode_RightButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        // Ignore the release that ends a right-drag pan.
+        if ((e.GetPosition(ScenarioCanvas) - scenarioRightDownPoint).Length > 6) return;
+        if (OpenNodeEditorFor(e.OriginalSource))
+            e.Handled = true;
+    }
+
+    private void ScenarioNode_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Left) return;
+        if (OpenNodeEditorFor(e.OriginalSource))
+            e.Handled = true;
+    }
+
+    private bool OpenNodeEditorFor(object originalSource)
+    {
+        if (FindNodeViewModel(originalSource as DependencyObject) is not { } node) return false;
+        if (DataContext is not MainViewModel vm) return false;
+
+        var command = vm.ScenariosVm.OpenNodeEditorCommand;
+        if (!command.CanExecute(node)) return false;
+        command.Execute(node);
+        return true;
+    }
+
+    private static ScenarioNodeViewModel? FindNodeViewModel(DependencyObject? source)
+    {
+        while (source is not null)
+        {
+            if (source is FrameworkElement { DataContext: ScenarioNodeViewModel node })
+                return node;
+            source = source is Visual or System.Windows.Media.Media3D.Visual3D
+                ? VisualTreeHelper.GetParent(source)
+                : LogicalTreeHelper.GetParent(source);
+        }
+        return null;
     }
 
     private void OnMessageDeleteKey(object sender, KeyEventArgs e)

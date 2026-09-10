@@ -84,9 +84,15 @@ public partial class ScenarioNodeViewModel : ObservableObject
     public ObservableCollection<ConnectorViewModel> Input { get; } = [];
     public ObservableCollection<ConnectorViewModel> Output { get; } = [];
 
+    /// <summary>Start and End are structural — they can't be deleted from the canvas.</summary>
+    public bool IsDeletable => Type is not (NodeType.Start or NodeType.End);
+
     public ScenarioNodeViewModel()
     {
         InitializeConnectors();
+        // Type defaults to Start (enum 0), so OnTypeChanged never fires for a Start node —
+        // set the title explicitly here or it renders with an empty header.
+        UpdateTitleFromType();
     }
 
     partial void OnTypeChanged(NodeType value)
@@ -97,6 +103,7 @@ public partial class ScenarioNodeViewModel : ObservableObject
         OnPropertyChanged(nameof(SendModeLabel));
         OnPropertyChanged(nameof(IsReceiveNode));
         OnPropertyChanged(nameof(IsSendNode));
+        OnPropertyChanged(nameof(IsDeletable));
     }
 
     [RelayCommand]
