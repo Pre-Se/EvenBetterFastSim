@@ -28,7 +28,13 @@ dotnet run --project EvenBetterFastSim/EvenBetterFastSim.csproj
 
 ## Usage
 --------
+### 0. Download
 
+You can download the application using the following link
+[Releases · Pre-Se/EvenBetterFastSim](https://github.com/Pre-Se/EvenBetterFastSim/releases)
+
+Download the **`.zip`** file: it contains the exe together with the default
+message library (`Library\DefaultLibrary.msgpack`).
 ### 1. Pick or create an instance (the Hub)
 
 Launching the app with **no arguments** opens the **Hub**. Each row is a named instance (a name plus an IP / port / connection mode/library); every profile launches as its own

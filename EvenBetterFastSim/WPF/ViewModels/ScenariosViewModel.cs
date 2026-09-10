@@ -199,9 +199,12 @@ public partial class ScenariosViewModel : ObservableObject
             SelectedScenario.Name = newName;
     }
 
-    /// <summary>Overall per-run deadline in seconds; 0 = no limit. Bounds how long each (loop) run can take.</summary>
+    /// <summary>
+    /// Overall per-run deadline in seconds; <c>0</c> = wait indefinitely (Receive nodes block until their
+    /// message arrives or the run is cancelled). Also bounds each loop iteration.
+    /// </summary>
     [ObservableProperty]
-    private int runTimeoutSeconds;
+    private int runTimeoutSeconds = 30;
 
     private bool CanRunScenario() => !IsRunning && !IsLooping && SelectedScenario != null;
 

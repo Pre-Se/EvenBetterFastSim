@@ -109,6 +109,7 @@ public partial class App
         services.AddScoped<LibraryMessagePackService>();
         services.AddScoped<ApplicationSettings>();
 
+        services.AddScoped<ScenarioReplyGuard>();
         services.AddScoped<ScenariosViewModel>();
         services.AddScoped<ScenarioExecutionService>();
         services.AddTransient<NodeResponderViewModel>();

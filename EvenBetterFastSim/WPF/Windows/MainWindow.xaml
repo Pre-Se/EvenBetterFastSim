@@ -508,7 +508,7 @@
                                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                                 <TextBox Width="52" VerticalAlignment="Center"
                                          Text="{Binding RunTimeoutSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                         ToolTip="Max seconds per run before it fails (0 = no limit). Bounds each loop iteration." />
+                                         ToolTip="Max seconds per run (0 = wait forever — Receive nodes block until their message arrives or you hit Cancel). Also bounds each loop iteration." />
                             </WrapPanel>
                         </DockPanel>
                     </Border>

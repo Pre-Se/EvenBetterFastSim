@@ -33,12 +33,12 @@
 		<PackageReference Include="WPF-UI" Version="4.3.0" />
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />  
 		<PackageReference Include="FluentResults" Version="4.0.0" />  
-		<PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.11" />  
-		<PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.11" />  
-		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.11" />  
-		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.11" />  
-		<PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.11" />  
-		<PackageReference Include="Microsoft.Extensions.Options" Version="10.0.11" />  
+		<PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.12" />  
+		<PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.12" />  
+		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.12" />  
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />  
+		<PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.12" />  
+		<PackageReference Include="Microsoft.Extensions.Options" Version="10.0.12" />  
 		<PackageReference Include="System.Reactive" Version="7.0.0" />
 		<PackageReference Include="Nodify" Version="7.3.0" />
 		<PackageReference Include="MessagePack" Version="3.*" />
@@ -81,7 +81,7 @@
 
 <ItemGroup>
   <PackageReference Update="DotNet.ReproducibleBuilds" Version="2.0.5" />
-  <PackageReference Update="Microsoft.SourceLink.GitHub" Version="10.0.400" />
+  <PackageReference Update="Microsoft.SourceLink.GitHub" Version="10.0.401" />
   <PackageReference Update="Nerdbank.GitVersioning" Version="3.10.94" />
 </ItemGroup>  
 
