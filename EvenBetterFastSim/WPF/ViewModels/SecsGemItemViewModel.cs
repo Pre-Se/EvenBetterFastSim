@@ -21,6 +21,7 @@ public partial class SecsGemItemViewModel : ObservableObject, IBaseViewModel
     private const int BinaryDisplayThreshold = 256;
 
     public Action? CloseAction { get; set; }
+    public string HeaderText => "Modify Item";
     public bool ValueVisibility => GetValueVisibility();
     public bool DelimiterVisibility => GetDelimiterVisibility();
     public bool ShowBinaryModeSelector => SecsGemItemCopy.FormatType is SecsGemItemFormatType.Binary;

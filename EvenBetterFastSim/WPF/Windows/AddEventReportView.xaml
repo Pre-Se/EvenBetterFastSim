@@ -19,11 +19,6 @@
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <TextBlock Grid.Row="0" Grid.ColumnSpan="2"
-                   Text="Add Event"
-                   FontSize="16" FontWeight="SemiBold"
-                   Margin="0,0,0,20" />
-
         <TextBlock Grid.Row="1" Grid.Column="0"
                    Text="CEID" VerticalAlignment="Center"
                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"

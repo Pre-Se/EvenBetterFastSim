@@ -16,6 +16,7 @@ public partial class AddEquipmentVariableViewModel : ObservableObject, IBaseView
     private readonly IRegistry<SecsGemEquipmentVariable> variableRegistry;
     private SecsGemEquipmentVariable? originalItem;
     public Action? CloseAction { get; set; }
+    public string HeaderText => "Add Variable";
     public bool ValueVisibility => GetValueVisibility();
     public bool DelimiterVisibility => GetDelimiterVisibility();
 

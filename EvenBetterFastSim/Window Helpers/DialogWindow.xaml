@@ -51,7 +51,14 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <ui:TitleBar Grid.Row="0" Title="{Binding HeaderText}" />
+        <ui:TitleBar Grid.Row="0">
+            <ui:TitleBar.Title>
+                <PriorityBinding>
+                    <Binding Path="HeaderText" />
+                    <Binding Path="Title" />
+                </PriorityBinding>
+            </ui:TitleBar.Title>
+        </ui:TitleBar>
 
         <ContentControl Grid.Row="1" Content="{Binding}" Margin="16,12,16,8" />
 

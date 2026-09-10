@@ -27,11 +27,6 @@
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <TextBlock Grid.Row="0" Grid.ColumnSpan="2"
-                   Text="{Binding Title}"
-                   FontSize="15" FontWeight="SemiBold"
-                   Margin="0,0,0,16" />
-
         <TextBlock Grid.Row="1" Grid.Column="0" Text="{Binding NameLabel}"
                    VerticalAlignment="Center" Margin="0,0,12,10"
                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" />

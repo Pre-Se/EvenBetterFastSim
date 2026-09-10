@@ -25,11 +25,6 @@
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <TextBlock Grid.Row="0" Grid.ColumnSpan="2"
-                   Text="Add Variable"
-                   FontSize="16" FontWeight="SemiBold"
-                   Margin="0,0,0,20" />
-
         <TextBlock Grid.Row="1" Grid.Column="0"
                    Text="Variable ID" VerticalAlignment="Center"
                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"

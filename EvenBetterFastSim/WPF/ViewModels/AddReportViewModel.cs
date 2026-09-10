@@ -14,6 +14,7 @@ public partial class AddReportViewModel(IRegistry<SecsGemReport> reportRegistry)
     public int Rptid { get; set; }
     public string ReportName { get; set; } = string.Empty;
     public Action? CloseAction { get; set; }
+    public string HeaderText => "Add Report";
 
     public void LoadForEdit(SecsGemReport item)
     {
