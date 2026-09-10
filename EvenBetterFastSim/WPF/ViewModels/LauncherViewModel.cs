@@ -88,7 +88,9 @@ public partial class LauncherViewModel : ObservableObject, IBaseViewModel
         var editor = new InstanceProfileViewModel(
             "New instance", "Name", showConnectionMode: true,
             draft.Name, draft.IpAddress, draft.Port, draft.ConnectionMode,
-            name => InstanceProfileStore.IsValidName(name, Profiles));
+            name => InstanceProfileStore.IsValidName(name, Profiles),
+            showLaunchAfterCreate: true,
+            launchAfterCreateLabel: "Open instance after creation");
 
         windowManager.ShowDialog(editor);
         if (!editor.Accepted) return;
@@ -97,6 +99,9 @@ public partial class LauncherViewModel : ObservableObject, IBaseViewModel
         Profiles.Add(draft);
         Persist();
         SelectedProfile = draft;
+
+        if (editor.LaunchAfterCreate)
+            LaunchProfile(draft);
     }
 
     [RelayCommand(CanExecute = nameof(HasSelection))]
@@ -147,7 +152,9 @@ public partial class LauncherViewModel : ObservableObject, IBaseViewModel
             "New linked pair", "Base name", showConnectionMode: false,
             UniqueName("link"), "127.0.0.1", 5000, ConnectionMode.Passive,
             baseName => InstanceProfileStore.IsValidName($"{baseName}-passive", Profiles)
-                        && InstanceProfileStore.IsValidName($"{baseName}-active", Profiles));
+                        && InstanceProfileStore.IsValidName($"{baseName}-active", Profiles),
+            showLaunchAfterCreate: true,
+            launchAfterCreateLabel: "Open both instances after creation");
 
         windowManager.ShowDialog(editor);
         if (!editor.Accepted) return;
@@ -173,6 +180,13 @@ public partial class LauncherViewModel : ObservableObject, IBaseViewModel
         store.SeedSettingsFile(active);
         Persist();
         SelectedProfile = passive;
+
+        if (editor.LaunchAfterCreate)
+        {
+            // Start the passive (listening) side first so it is ready when the active side connects.
+            LaunchProfile(passive);
+            LaunchProfile(active);
+        }
     }
 
     private static void Apply(InstanceProfile profile, InstanceProfileViewModel editor)

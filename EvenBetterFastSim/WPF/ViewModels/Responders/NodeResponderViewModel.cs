@@ -19,17 +19,25 @@ public enum NodeResponderMode
     Bindings
 }
 
+/// <summary>An upstream Receive node offered as a value source: its id, a display label, and a clone of its message shape.</summary>
+public sealed record UpstreamReceive(string NodeId, string Label, SecsGemDataMessage Message);
+
 /// <summary>
 /// One dialog, two faces. For a Receive node it edits the match conditions that gate the step;
-/// for a Send node it edits how each outgoing item gets its value — fixed, or pulled from the
-/// message the nearest upstream Receive captured.
+/// for a Send node it edits how each outgoing item gets its value — fixed, or pulled from any
+/// message received earlier in the chain (pick the message, then the parameter).
 /// </summary>
 public partial class NodeResponderViewModel : ObservableObject, IBaseViewModel
 {
     public Action? CloseAction { get; set; }
 
     private ScenarioNodeViewModel? node;
-    private SecsGemDataMessage? triggerShape;
+
+    /// <summary>Bindings mode: cloned message shapes keyed by the Receive node id that captured them.</summary>
+    private readonly Dictionary<string, SecsGemDataMessage> triggerShapes = [];
+
+    /// <summary>Bindings mode: selectable parameters per Receive node id.</summary>
+    private readonly Dictionary<string, List<PathOption>> parametersByNode = [];
 
     [ObservableProperty] public partial NodeResponderMode Mode { get; private set; }
     [ObservableProperty] public partial string HeaderText { get; private set; } = string.Empty;
@@ -39,7 +47,10 @@ public partial class NodeResponderViewModel : ObservableObject, IBaseViewModel
     public bool IsBindings => Mode == NodeResponderMode.Bindings;
 
     public ObservableCollection<ResponderFieldViewModel> Fields { get; } = [];
-    public ObservableCollection<PathOption> IncomingPaths { get; } = [];
+
+    /// <summary>First dropdown options — the received messages available on this path.</summary>
+    public ObservableCollection<UpstreamMessageOption> SourceMessages { get; } = [];
+
     public ObservableCollection<SampleInputViewModel> SampleInputs { get; } = [];
 
     public IReadOnlyList<ConditionKind> ConditionKinds { get; } = Enum.GetValues<ConditionKind>();
@@ -59,13 +70,13 @@ public partial class NodeResponderViewModel : ObservableObject, IBaseViewModel
         HeaderText = $"Match — {expected?.Name ?? receiveNode.Title}";
         SubtitleText = "This step proceeds only when the received message satisfies every condition. Leave rows on \"any\" to ignore them.";
 
-        BuildFields(expected, ResponderFieldMode.Trigger);
+        BuildFields(expected, ResponderFieldMode.Trigger, parameterLookup: null);
         ApplyStoredConditions();
         OnPropertyChanged(nameof(IsConditions));
         OnPropertyChanged(nameof(IsBindings));
     }
 
-    public void InitializeForSend(ScenarioNodeViewModel sendNode, SecsGemTransaction? upstreamTransaction, bool upstreamUsesReply)
+    public void InitializeForSend(ScenarioNodeViewModel sendNode, IReadOnlyList<UpstreamReceive> upstreamReceives)
     {
         node = sendNode;
         Mode = NodeResponderMode.Bindings;
@@ -73,34 +84,34 @@ public partial class NodeResponderViewModel : ObservableObject, IBaseViewModel
         var outgoing = sendNode.Transaction?.PrimaryMessage;
         HeaderText = $"Response values — {outgoing?.Name ?? sendNode.Title}";
 
-        if (upstreamTransaction is not null)
+        foreach (var upstream in upstreamReceives)
         {
-            var source = upstreamUsesReply ? upstreamTransaction.ReplyMessage : upstreamTransaction.PrimaryMessage;
-            triggerShape = (SecsGemDataMessage)source.Clone();
-        }
+            triggerShapes[upstream.NodeId] = upstream.Message;
+            SourceMessages.Add(new UpstreamMessageOption(upstream.NodeId, upstream.Label));
 
-        SubtitleText = triggerShape is null
-            ? "No upstream Receive on this path — you can still set fixed values."
-            : $"Each item can keep its value, be set to a fixed value, or be pulled from the received {triggerShape.Name}.";
-
-        BuildFields(outgoing, ResponderFieldMode.Response);
-
-        if (triggerShape is not null)
-        {
+            var parameters = new List<PathOption>();
             var index = 0;
-            foreach (var item in triggerShape.Children.OfType<SecsGemItem>())
+            foreach (var item in upstream.Message.Children.OfType<SecsGemItem>())
             {
-                CollectPaths(new ResponderFieldViewModel(item, index.ToString(), ResponderFieldMode.Trigger));
+                CollectParameters(new ResponderFieldViewModel(item, index.ToString(), ResponderFieldMode.Trigger),
+                    upstream.NodeId, upstream.Label, parameters);
                 index++;
             }
-            foreach (var path in IncomingPaths)
-                SampleInputs.Add(new SampleInputViewModel(path));
+            parametersByNode[upstream.NodeId] = parameters;
         }
 
+        SubtitleText = upstreamReceives.Count == 0
+            ? "No upstream Receive on this path — you can still set fixed values."
+            : "Echo / Copy branch: pick a received message, then the parameter inside it.";
+
+        BuildFields(outgoing, ResponderFieldMode.Response, LookupParameters);
         ApplyStoredBindings();
         OnPropertyChanged(nameof(IsConditions));
         OnPropertyChanged(nameof(IsBindings));
     }
+
+    private IReadOnlyList<PathOption> LookupParameters(string? nodeId) =>
+        nodeId is not null && parametersByNode.TryGetValue(nodeId, out var list) ? list : [];
 
     // ---- build / restore --------------------------------------------
 
@@ -108,7 +119,8 @@ public partial class NodeResponderViewModel : ObservableObject, IBaseViewModel
         node.Transaction is null ? null
         : node.UseReplyMessage ? node.Transaction.ReplyMessage : node.Transaction.PrimaryMessage;
 
-    private void BuildFields(SecsGemDataMessage? message, ResponderFieldMode mode)
+    private void BuildFields(SecsGemDataMessage? message, ResponderFieldMode mode,
+        Func<string?, IReadOnlyList<PathOption>>? parameterLookup)
     {
         Fields.Clear();
         if (message is null) return;
@@ -117,16 +129,19 @@ public partial class NodeResponderViewModel : ObservableObject, IBaseViewModel
         var index = 0;
         foreach (var item in clone.Children.OfType<SecsGemItem>())
         {
-            Fields.Add(new ResponderFieldViewModel(item, index.ToString(), mode));
+            Fields.Add(new ResponderFieldViewModel(item, index.ToString(), mode, parameterLookup));
             index++;
         }
     }
 
-    private void CollectPaths(ResponderFieldViewModel field)
+    private void CollectParameters(ResponderFieldViewModel field, string sourceNodeId, string sourceLabel, List<PathOption> into)
     {
-        IncomingPaths.Add(new PathOption(field.Path, $"[{field.Path}]  {field.DisplayLabel}"));
+        into.Add(new PathOption(field.Path, $"[{field.Path}]  {field.DisplayLabel}", sourceNodeId));
+        if (field.IsLeaf)
+            SampleInputs.Add(new SampleInputViewModel(sourceNodeId, $"{sourceLabel} · [{field.Path}]", field.Path));
+
         foreach (var child in field.Children)
-            CollectPaths(child);
+            CollectParameters(child, sourceNodeId, sourceLabel, into);
     }
 
     private void ApplyStoredConditions()
@@ -145,11 +160,19 @@ public partial class NodeResponderViewModel : ObservableObject, IBaseViewModel
         {
             if (FindByPath(Fields, binding.TargetItemPath) is not { } target) continue;
             target.Source = binding.Source;
+
             if (binding.Source == BindingSourceKind.Literal)
+            {
                 target.StaticValue = binding.SourceRef;
-            else
-                target.IncomingPath = IncomingPaths.FirstOrDefault(p => p.Path == binding.SourceRef)
-                                      ?? new PathOption(binding.SourceRef, $"[{binding.SourceRef}]");
+                continue;
+            }
+
+            // Setting SourceMessage repopulates AvailableParameters, then we pick the parameter.
+            target.SourceMessage =
+                SourceMessages.FirstOrDefault(m => m.NodeId == binding.SourceNodeId)
+                ?? SourceMessages.FirstOrDefault();
+            target.SourceParameter =
+                target.AvailableParameters.FirstOrDefault(p => p.Path == binding.SourceRef);
         }
     }
 
@@ -185,24 +208,26 @@ public partial class NodeResponderViewModel : ObservableObject, IBaseViewModel
             return;
         }
 
-        var incoming = triggerShape is null ? null : (SecsGemDataMessage)triggerShape.Clone();
-        if (incoming is not null)
+        var samples = triggerShapes.ToDictionary(
+            kvp => kvp.Key,
+            kvp => (SecsGemDataMessage)kvp.Value.Clone());
+
+        foreach (var sample in SampleInputs)
         {
-            foreach (var sample in SampleInputs)
+            if (samples.TryGetValue(sample.SourceNodeId, out var message)
+                && SecsGemItemPath.TryResolve(message, sample.ItemPath, out var item))
             {
-                if (SecsGemItemPath.TryResolve(incoming, sample.Path.Path, out var item))
-                    item.SetValuesFromStrings(sample.Value.Split(',', StringSplitOptions.RemoveEmptyEntries));
+                item.SetValuesFromStrings(sample.Value.Split(',', StringSplitOptions.RemoveEmptyEntries));
             }
         }
 
+        var fallback = samples.Values.LastOrDefault();
+        SecsGemDataMessage? Resolve(string? id) =>
+            id is not null && samples.TryGetValue(id, out var m) ? m : fallback;
+
         var outgoing = (SecsGemDataMessage)node.Transaction.PrimaryMessage.Clone();
         foreach (var binding in CurrentBindings())
-        {
-            if (incoming is not null)
-                binding.Apply(outgoing, incoming);
-            else if (binding.Source == BindingSourceKind.Literal)
-                binding.Apply(outgoing, outgoing);
-        }
+            binding.Apply(outgoing, Resolve);
 
         var index = 0;
         foreach (var item in outgoing.Children.OfType<SecsGemItem>())
@@ -249,9 +274,11 @@ public partial class NodeResponderViewModel : ObservableObject, IBaseViewModel
 }
 
 /// <summary>An incoming leaf plus a sample value, used by the Bindings-mode "Test" button.</summary>
-public partial class SampleInputViewModel(PathOption path) : ObservableObject
+public partial class SampleInputViewModel(string sourceNodeId, string label, string itemPath) : ObservableObject
 {
-    public PathOption Path { get; } = path;
+    public string SourceNodeId { get; } = sourceNodeId;
+    public string Label { get; } = label;
+    public string ItemPath { get; } = itemPath;
 
     [ObservableProperty]
     public partial string Value { get; set; } = string.Empty;

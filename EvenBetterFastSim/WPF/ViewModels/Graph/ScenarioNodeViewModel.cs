@@ -138,6 +138,7 @@ public partial class ScenarioNodeViewModel : ObservableObject
             NodeType.SendAndWait => ["Success", "Failure"],
             NodeType.Receive     => ["Success", "Failure"],
             NodeType.Condition   => ["YES", "NO"],
+            NodeType.And         => ["Out"],
             _                    => ["Done"],
         };
 
@@ -172,6 +173,7 @@ public partial class ScenarioNodeViewModel : ObservableObject
             NodeType.Condition => label ?? "If",
             NodeType.Wait => label ?? "Wait",
             NodeType.Receive => label ?? "Receive",
+            NodeType.And => "AND",
             _ => label ?? Type.ToString()
         };
     }

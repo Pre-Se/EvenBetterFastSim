@@ -6,11 +6,15 @@ using System.Windows.Threading;
 using EvenBetterFastSim.WPF.ViewModels;
 using EvenBetterFastSim.WPF.ViewModels.Graph;
 using SecsGemBaseItems.Data_Containers;
+using SecsGemScenarioEngine.Models;
 using Wpf.Ui.Controls;
 
 namespace EvenBetterFastSim.WPF.Windows;
 
 internal record ScenarioDragData(SecsGemTransaction Transaction, bool IsPrimary);
+
+/// <summary>Drag payload for a structural node dropped from the node palette.</summary>
+internal record ScenarioNodeDragData(NodeType NodeType);
 
 public partial class MainWindow
 {
@@ -185,26 +189,39 @@ public partial class MainWindow
         return null;
     }
 
+    // Palette chip (e.g. "AND") — start a drag on mouse-down.
+    private void NodePaletteChip_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: string tag } chip && Enum.TryParse<NodeType>(tag, out var type))
+            DragDrop.DoDragDrop(chip, new ScenarioNodeDragData(type), DragDropEffects.Copy);
+    }
+
     private void ScenarioCanvas_PreviewDragOver(object sender, DragEventArgs e)
     {
-        if (!e.Data.GetDataPresent(typeof(ScenarioDragData))) return;
+        if (!e.Data.GetDataPresent(typeof(ScenarioDragData)) && !e.Data.GetDataPresent(typeof(ScenarioNodeDragData)))
+            return;
         e.Effects = DragDropEffects.Copy;
         e.Handled = true;
     }
 
     private void ScenarioCanvas_PreviewDrop(object sender, DragEventArgs e)
     {
-        if (!e.Data.GetDataPresent(typeof(ScenarioDragData))) return;
         if (DataContext is not MainViewModel vm) return;
 
-        var dragData = (ScenarioDragData)e.Data.GetData(typeof(ScenarioDragData))!;
         var position = e.GetPosition(ScenarioCanvas);
-
         var transform = ScenarioCanvas.ViewportTransform;
         if (transform != null)
             position = transform.Inverse.Transform(position);
 
-        vm.ScenariosVm.AddNodeFromDrop(dragData.Transaction, position, dragData.IsPrimary);
-        e.Handled = true;
+        if (e.Data.GetData(typeof(ScenarioDragData)) is ScenarioDragData transactionDrag)
+        {
+            vm.ScenariosVm.AddNodeFromDrop(transactionDrag.Transaction, position, transactionDrag.IsPrimary);
+            e.Handled = true;
+        }
+        else if (e.Data.GetData(typeof(ScenarioNodeDragData)) is ScenarioNodeDragData nodeDrag)
+        {
+            vm.ScenariosVm.AddStructuralNode(nodeDrag.NodeType, position);
+            e.Handled = true;
+        }
     }
 }

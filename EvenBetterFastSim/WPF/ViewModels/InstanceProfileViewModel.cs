@@ -27,6 +27,21 @@ public partial class InstanceProfileViewModel : ObservableValidator, IBaseViewMo
     public string NameLabel { get; }
     public bool ShowConnectionMode { get; }
 
+    /// <summary>
+    /// True when the "open instance(s) after creation" checkbox should be shown
+    /// (i.e. this dialog is creating profiles, not editing an existing one).
+    /// </summary>
+    public bool ShowLaunchAfterCreate { get; }
+
+    public string LaunchAfterCreateLabel { get; }
+
+    /// <summary>
+    /// When <see cref="ShowLaunchAfterCreate"/> is true, whether the hub should launch the
+    /// newly created instance(s) immediately after the dialog is accepted.
+    /// </summary>
+    [ObservableProperty]
+    private bool launchAfterCreate;
+
     [ObservableProperty]
     [NotifyDataErrorInfo]
     [NotifyCanExecuteChangedFor(nameof(AcceptButtonClickCommand))]
@@ -55,11 +70,16 @@ public partial class InstanceProfileViewModel : ObservableValidator, IBaseViewMo
         string ipAddress,
         ushort port,
         ConnectionMode connectionMode,
-        Func<string, bool> isNameValid)
+        Func<string, bool> isNameValid,
+        bool showLaunchAfterCreate = false,
+        string launchAfterCreateLabel = "Open instance after creation")
     {
         Title = title;
         NameLabel = nameLabel;
         ShowConnectionMode = showConnectionMode;
+        ShowLaunchAfterCreate = showLaunchAfterCreate;
+        LaunchAfterCreateLabel = launchAfterCreateLabel;
+        launchAfterCreate = showLaunchAfterCreate;
         this.name = name;
         this.ipAddress = ipAddress;
         this.port = port;

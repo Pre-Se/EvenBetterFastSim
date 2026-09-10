@@ -499,8 +499,16 @@
                                            Style="{StaticResource ToolbarButtonStyle}" Appearance="Secondary" Margin="0,0,8,0" />
                                 <ui:Button Content="Run" Command="{Binding RunScenarioCommand}"
                                            Style="{StaticResource ToolbarButtonStyle}" Appearance="Primary" Margin="0,0,4,0" />
+                                <ToggleButton Content="Loop" IsChecked="{Binding IsLooping, Mode=TwoWay}"
+                                              Padding="10,4" Margin="0,0,4,0" VerticalAlignment="Center"
+                                              ToolTip="Keep restarting this scenario from Start after it finishes" />
                                 <ui:Button Content="Cancel" Command="{Binding CancelRunCommand}"
-                                           Style="{StaticResource ToolbarButtonStyle}" Appearance="Secondary" />
+                                           Style="{StaticResource ToolbarButtonStyle}" Appearance="Secondary" Margin="0,0,10,0" />
+                                <TextBlock Text="Timeout (s)" VerticalAlignment="Center" Margin="0,0,4,0"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                <TextBox Width="52" VerticalAlignment="Center"
+                                         Text="{Binding RunTimeoutSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="Max seconds per run before it fails (0 = no limit). Bounds each loop iteration." />
                             </WrapPanel>
                         </DockPanel>
                     </Border>
@@ -575,6 +583,10 @@
                                                     </DataTrigger>
                                                     <DataTrigger Binding="{Binding Type}" Value="End">
                                                         <Setter Property="HeaderBrush" Value="#6E7681" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Type}" Value="And">
+                                                        <Setter Property="HeaderBrush" Value="#8957E5" />
+                                                        <Setter Property="BorderBrush" Value="#8957E5" />
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -706,13 +718,31 @@
                         <Grid Margin="8,6">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
-                            <TextBlock Grid.Row="0" Text="DRAG TO CANVAS"
+
+                            <TextBlock Grid.Row="0" Text="NODES"
+                                       FontSize="10" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Margin="0,0,0,6" />
+                            <WrapPanel Grid.Row="1" Margin="0,0,0,10">
+                                <Border Tag="And"
+                                        MouseLeftButtonDown="NodePaletteChip_MouseLeftButtonDown"
+                                        Background="{DynamicResource SubtleFillColorSecondaryBrush}"
+                                        BorderBrush="#8957E5" BorderThickness="1"
+                                        CornerRadius="4" Padding="10,4" Cursor="Hand"
+                                        ToolTip="Join: continues only when every incoming connection has arrived">
+                                    <TextBlock Text="AND" FontWeight="SemiBold" />
+                                </Border>
+                            </WrapPanel>
+
+                            <TextBlock Grid.Row="2" Text="DRAG TO CANVAS"
                                        FontSize="10" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                        Margin="0,0,0,8" />
-                            <TreeView Grid.Row="1" Name="TransactionLibraryTree"
+                            <TreeView Grid.Row="3" Name="TransactionLibraryTree"
                                       ItemsSource="{Binding AvailableTransactions}"
                                       VirtualizingPanel.IsVirtualizing="True"
                                       VirtualizingPanel.VirtualizationMode="Recycling"
@@ -955,14 +985,17 @@
 
                 <!-- Control state buttons (right) -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <CheckBox Content="Auto-online on connect"
+                              IsChecked="{Binding AutoStartOnline}"
+                              VerticalAlignment="Center" Margin="0,0,12,0"
+                              ToolTip="Automatically request ON-LINE once communications are established after connecting" />
                     <ui:Button Content="Online" Command="{Binding TurnOnlineCommand}"
                                Appearance="Secondary" Margin="0,0,4,0" />
                     <ui:Button Content="Offline" Command="{Binding TurnOfflineCommand}"
                                Appearance="Secondary" Margin="0,0,4,0" />
-                    <ui:Button Content="Local" Command="{Binding TurnLocalCommand}"
-                               Appearance="Secondary" Margin="0,0,4,0" />
-                    <ui:Button Content="Remote" Command="{Binding TurnRemoteCommand}"
-                               Appearance="Secondary" />
+                    <ui:Button Content="{Binding OnlineModeLabel}" Command="{Binding ToggleOnlineModeCommand}"
+                               Appearance="Secondary"
+                               ToolTip="Toggle online substate: Local ↔ Remote" />
                 </StackPanel>
             </Grid>
         </Border>

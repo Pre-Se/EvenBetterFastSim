@@ -51,7 +51,7 @@
                           SelectedItem="{Binding Source, Mode=TwoWay}" />
                 <Grid Grid.Column="2" Margin="6,0,0,0"
                       Visibility="{Binding IsLeaf, Converter={StaticResource BoolToVis}}">
-                    <TextBox Width="220"
+                    <TextBox Width="330"
                              ToolTip="Fixed value for this item"
                              Text="{Binding StaticValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
                         <TextBox.Style>
@@ -65,12 +65,9 @@
                             </Style>
                         </TextBox.Style>
                     </TextBox>
-                    <ComboBox Width="260"
-                              ToolTip="Received item to copy from"
-                              ItemsSource="{Binding DataContext.IncomingPaths, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                              SelectedItem="{Binding IncomingPath, Mode=TwoWay}">
-                        <ComboBox.Style>
-                            <Style TargetType="ComboBox">
+                    <StackPanel Orientation="Horizontal">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
                                 <Setter Property="Visibility" Value="Collapsed" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding Source}" Value="Echo">
@@ -81,8 +78,16 @@
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
-                        </ComboBox.Style>
-                    </ComboBox>
+                        </StackPanel.Style>
+                        <ComboBox Width="130" Margin="0,0,6,0"
+                                  ToolTip="Which received message"
+                                  ItemsSource="{Binding DataContext.SourceMessages, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                  SelectedItem="{Binding SourceMessage, Mode=TwoWay}" />
+                        <ComboBox Width="194"
+                                  ToolTip="Which parameter in that message"
+                                  ItemsSource="{Binding AvailableParameters}"
+                                  SelectedItem="{Binding SourceParameter, Mode=TwoWay}" />
+                    </StackPanel>
                 </Grid>
             </Grid>
         </HierarchicalDataTemplate>
@@ -135,23 +140,25 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <ItemsControl Grid.Row="0" ItemsSource="{Binding SampleInputs}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Grid Margin="0,2">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="160" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" VerticalAlignment="Center"
-                                           Text="{Binding Path.Label}" TextTrimming="CharacterEllipsis"
-                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                <TextBox Grid.Column="1"
-                                         Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                            </Grid>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                <ScrollViewer Grid.Row="0" MaxHeight="140" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding SampleInputs}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="160" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" VerticalAlignment="Center"
+                                               Text="{Binding Label}" TextTrimming="CharacterEllipsis"
+                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                    <TextBox Grid.Column="1"
+                                             Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
 
                 <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,8,0,0">
                     <Button Content="Test with sample values" Command="{Binding RunTestCommand}" Margin="0,0,12,0" />

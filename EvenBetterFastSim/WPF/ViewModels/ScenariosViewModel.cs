@@ -71,7 +71,13 @@ public partial class ScenariosViewModel : ObservableObject
     private PendingConnectionViewModel pendingConnection = new();
 
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RunScenarioCommand))]
     private bool isRunning;
+
+    /// <summary>When on, the selected scenario restarts from Start every time it finishes.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RunScenarioCommand))]
+    private bool isLooping;
 
     public ICommand DisconnectConnectorCommand { get; }
 
@@ -132,6 +138,9 @@ public partial class ScenariosViewModel : ObservableObject
 
     partial void OnSelectedScenarioChanged(ScenarioListItem? value)
     {
+        if (IsLooping)
+            IsLooping = false; // don't keep looping a scenario the user navigated away from
+
         if (value != null)
         {
             if (value.CachedNodes != null && value.CachedConnections != null)
@@ -190,10 +199,27 @@ public partial class ScenariosViewModel : ObservableObject
             SelectedScenario.Name = newName;
     }
 
-    [RelayCommand]
+    /// <summary>Overall per-run deadline in seconds; 0 = no limit. Bounds how long each (loop) run can take.</summary>
+    [ObservableProperty]
+    private int runTimeoutSeconds;
+
+    private bool CanRunScenario() => !IsRunning && !IsLooping && SelectedScenario != null;
+
+    /// <summary>Runs the selected scenario once.</summary>
+    [RelayCommand(CanExecute = nameof(CanRunScenario))]
     private async Task RunScenario()
     {
-        if (IsRunning || SelectedScenario == null) return;
+        if (SelectedScenario is { } scenario)
+            await RunOnceAsync(scenario, isLoopIteration: false);
+    }
+
+    /// <summary>One pass of a scenario from Start to End (or failure / cancellation).</summary>
+    private async Task RunOnceAsync(
+        ScenarioListItem scenario,
+        bool isLoopIteration,
+        HashSet<global::Logging.Interfaces.ILoggedDataMessage>? consumedAcrossRuns = null)
+    {
+        if (IsRunning) return;
 
         IsRunning = true;
         runCts = new CancellationTokenSource();
@@ -201,19 +227,26 @@ public partial class ScenariosViewModel : ObservableObject
         try
         {
             var graph = BuildGraphFromCanvas();
-            SelectedScenario.Graph = graph;
+            scenario.Graph = graph;
 
-            LogInfo($"Starting scenario '{SelectedScenario.Name}'...");
-            var result = await scenarioExecutionService.ExecuteAsync(graph, runCts.Token);
+            if (!isLoopIteration)
+                LogInfo($"Starting scenario '{scenario.Name}'...");
+
+            TimeSpan? deadline = RunTimeoutSeconds > 0 ? TimeSpan.FromSeconds(RunTimeoutSeconds) : null;
+            var result = await scenarioExecutionService.ExecuteAsync(graph, runCts.Token, consumedAcrossRuns, deadline);
 
             if (result.Success)
-                LogInfo($"Scenario '{SelectedScenario.Name}' completed ({result.CompletedSteps} steps)");
+                LogInfo($"Scenario '{scenario.Name}' completed ({result.CompletedSteps} steps)");
             else
-                LogError($"Scenario '{SelectedScenario.Name}' failed: {result.ErrorMessage}");
+                LogError($"Scenario '{scenario.Name}' failed: {result.ErrorMessage}");
         }
         catch (OperationCanceledException)
         {
-            LogInfo($"Scenario '{SelectedScenario.Name}' cancelled");
+            LogInfo($"Scenario '{scenario.Name}' cancelled");
+        }
+        catch (Exception ex)
+        {
+            LogError($"Scenario '{scenario.Name}' errored: {ex.Message}");
         }
         finally
         {
@@ -222,10 +255,44 @@ public partial class ScenariosViewModel : ObservableObject
         }
     }
 
+    partial void OnIsLoopingChanged(bool value)
+    {
+        if (value)
+            _ = RunLoopAsync();
+        else
+            runCts?.Cancel(); // stop the in-flight iteration promptly
+    }
+
+    private async Task RunLoopAsync()
+    {
+        if (SelectedScenario is not { } scenario)
+        {
+            IsLooping = false;
+            return;
+        }
+
+        // One shared set for the whole loop session: a message the equipment sent once can satisfy
+        // only one Receive across all iterations, so a single trigger doesn't re-fire every loop.
+        var consumed = new HashSet<global::Logging.Interfaces.ILoggedDataMessage>(ReferenceEqualityComparer.Instance);
+
+        LogInfo($"Loop started for '{scenario.Name}' — it will restart from Start after each finish.");
+        while (IsLooping && ReferenceEquals(SelectedScenario, scenario))
+        {
+            if (consumed.Count > 1000) consumed.Clear(); // messages older than the ~5 s inbound buffer can't be replayed anyway
+            await RunOnceAsync(scenario, isLoopIteration: true, consumed);
+            if (!IsLooping) break;
+            try { await Task.Delay(200); } catch { /* ignore */ }
+        }
+        LogInfo($"Loop stopped for '{scenario.Name}'.");
+    }
+
     [RelayCommand]
     private void CancelRun()
     {
-        runCts?.Cancel();
+        if (IsLooping)
+            IsLooping = false; // OnIsLoopingChanged cancels the current iteration
+        else
+            runCts?.Cancel();
     }
 
     public void Save()
@@ -411,9 +478,9 @@ public partial class ScenariosViewModel : ObservableObject
             }
             case NodeType.Send or NodeType.SendAndWait:
             {
-                var upstream = FindUpstreamReceive(node);
+                var upstreams = BuildUpstreamReceives(node);
                 var vm = viewModelLocator.GetViewModel<Responders.NodeResponderViewModel>();
-                vm.InitializeForSend(node, upstream?.Transaction, upstream?.UseReplyMessage ?? false);
+                vm.InitializeForSend(node, upstreams);
                 windowManager.ShowDialog(vm);
                 break;
             }
@@ -425,23 +492,57 @@ public partial class ScenariosViewModel : ObservableObject
     private void EditSelectedNode() =>
         OpenNodeEditor(SelectedNodes.Count == 1 ? SelectedNodes[0] : null);
 
-    /// <summary>Walks flow edges backwards from <paramref name="start"/> to the first Receive node.</summary>
-    private ScenarioNodeViewModel? FindUpstreamReceive(ScenarioNodeViewModel start)
+    /// <summary>
+    /// Walks flow edges backwards from <paramref name="start"/> collecting every Receive node on the
+    /// path (earliest first), each as a value source the response editor can pull parameters from.
+    /// </summary>
+    private IReadOnlyList<Responders.UpstreamReceive> BuildUpstreamReceives(ScenarioNodeViewModel start)
     {
+        var receives = new List<ScenarioNodeViewModel>();
         var visited = new HashSet<string>();
         var current = start;
+
         while (current is not null && visited.Add(current.Id))
         {
             var input = current.Input.FirstOrDefault();
-            if (input is null) return null;
+            if (input is null) break;
             var connection = Connections.FirstOrDefault(c => c.Target == input);
-            if (connection?.Source is null) return null;
+            if (connection?.Source is null) break;
             var previous = FindNodeForConnector(connection.Source);
-            if (previous is null) return null;
-            if (previous.Type == NodeType.Receive) return previous;
+            if (previous is null) break;
+            if (previous.Type == NodeType.Receive)
+                receives.Add(previous);
             current = previous;
         }
-        return null;
+
+        receives.Reverse(); // chain order
+
+        var result = new List<Responders.UpstreamReceive>();
+        var nameCounts = new Dictionary<string, int>();
+        foreach (var receive in receives)
+        {
+            if (receive.Transaction is null) continue;
+            var source = receive.UseReplyMessage ? receive.Transaction.ReplyMessage : receive.Transaction.PrimaryMessage;
+
+            nameCounts.TryGetValue(source.Name, out var seen);
+            nameCounts[source.Name] = seen + 1;
+            var label = seen == 0 ? source.Name : $"{source.Name} #{seen + 1}";
+
+            result.Add(new Responders.UpstreamReceive(receive.Id, label, (SecsGemDataMessage)source.Clone()));
+        }
+        return result;
+    }
+
+    /// <summary>Drops a structural node (e.g. an AND join) at the given canvas point.</summary>
+    public void AddStructuralNode(NodeType type, Point canvasPosition)
+    {
+        var node = new ScenarioNodeViewModel
+        {
+            Type = type,
+            Location = canvasPosition
+        };
+        Nodes.Add(node);
+        LogInfo($"Added {type} node to scenario");
     }
 
     public void AddNodeFromDrop(SecsGemTransaction transaction, Point canvasPosition, bool isPrimary = true)

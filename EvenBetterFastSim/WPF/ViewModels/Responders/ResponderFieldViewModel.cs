@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -73,15 +75,29 @@ public partial class ResponderFieldViewModel : ObservableObject
     [ObservableProperty]
     public partial string StaticValue { get; set; } = string.Empty;
 
-    /// <summary>Chosen incoming path for Echo / CopyBranch (one of <see cref="NodeResponderViewModel.IncomingPaths"/>).</summary>
+    /// <summary>Echo / CopyBranch — first dropdown: which received message to pull from.</summary>
     [ObservableProperty]
-    public partial PathOption? IncomingPath { get; set; }
+    public partial UpstreamMessageOption? SourceMessage { get; set; }
 
-    public ResponderFieldViewModel(SecsGemItem item, string path, ResponderFieldMode mode)
+    /// <summary>Echo / CopyBranch — second dropdown: which parameter within <see cref="SourceMessage"/>.</summary>
+    [ObservableProperty]
+    public partial PathOption? SourceParameter { get; set; }
+
+    /// <summary>Parameters available for the currently chosen <see cref="SourceMessage"/>.</summary>
+    public ObservableCollection<PathOption> AvailableParameters { get; } = [];
+
+    private readonly Func<string?, IReadOnlyList<PathOption>>? parameterLookup;
+
+    public ResponderFieldViewModel(
+        SecsGemItem item,
+        string path,
+        ResponderFieldMode mode,
+        Func<string?, IReadOnlyList<PathOption>>? parameterLookup = null)
     {
         Item = item;
         Path = path;
         Mode = mode;
+        this.parameterLookup = parameterLookup;
 
         InitialLeafValue = IsLeaf ? string.Join(",", item.GetStringValues()) : string.Empty;
         if (IsLeaf)
@@ -95,9 +111,22 @@ public partial class ResponderFieldViewModel : ObservableObject
         var index = 0;
         foreach (var child in item.Children.OfType<SecsGemItem>())
         {
-            Children.Add(new ResponderFieldViewModel(child, SecsGemItemPath.Combine(path, index), mode));
+            Children.Add(new ResponderFieldViewModel(child, SecsGemItemPath.Combine(path, index), mode, parameterLookup));
             index++;
         }
+    }
+
+    partial void OnSourceMessageChanged(UpstreamMessageOption? value)
+    {
+        AvailableParameters.Clear();
+        if (parameterLookup is not null && value is not null)
+        {
+            foreach (var option in parameterLookup(value.NodeId))
+                AvailableParameters.Add(option);
+        }
+
+        if (SourceParameter is not null && !AvailableParameters.Contains(SourceParameter))
+            SourceParameter = null;
     }
 
     /// <summary>Produces a <see cref="MatchCondition"/> for this row, or null when set to "any".</summary>
@@ -114,18 +143,27 @@ public partial class ResponderFieldViewModel : ObservableObject
     /// </summary>
     public ValueBinding? ToBinding() => Source switch
     {
-        BindingSourceKind.Echo when IncomingPath is { } p =>
-            new ValueBinding { TargetItemPath = Path, Source = BindingSourceKind.Echo, SourceRef = p.Path },
-        BindingSourceKind.CopyBranch when IncomingPath is { } p =>
-            new ValueBinding { TargetItemPath = Path, Source = BindingSourceKind.CopyBranch, SourceRef = p.Path },
+        BindingSourceKind.Echo when SourceParameter is { } p =>
+            new ValueBinding { TargetItemPath = Path, Source = BindingSourceKind.Echo, SourceRef = p.Path, SourceNodeId = p.SourceNodeId },
+        BindingSourceKind.CopyBranch when SourceParameter is { } p =>
+            new ValueBinding { TargetItemPath = Path, Source = BindingSourceKind.CopyBranch, SourceRef = p.Path, SourceNodeId = p.SourceNodeId },
         BindingSourceKind.Literal when IsLeaf && StaticValue != InitialLeafValue =>
             new ValueBinding { TargetItemPath = Path, Source = BindingSourceKind.Literal, SourceRef = StaticValue },
         _ => null
     };
 }
 
-/// <summary>An incoming-message item path plus a human label, offered in Echo/CopyBranch pickers.</summary>
-public sealed record PathOption(string Path, string Label)
+/// <summary>First dropdown of a value binding: a received message on the path (or null for "the latest").</summary>
+public sealed record UpstreamMessageOption(string? NodeId, string Label)
+{
+    public override string ToString() => Label;
+}
+
+/// <summary>
+/// Second dropdown of a value binding: one item path inside a received message, plus a human label
+/// and the id of the Receive node that captured it.
+/// </summary>
+public sealed record PathOption(string Path, string Label, string? SourceNodeId = null)
 {
     public override string ToString() => Label;
 }
