@@ -24,6 +24,13 @@ dotnet test  EvenBetterFastSim.Tests               -c Release
 
 Don't run `dotnet build EvenBetterFastSim.sln` from clean — the test project would evaluate its glob before the app output exists. This is what CI does ([.github/workflows/ci.yml](.github/workflows/ci.yml)).
 
+`EvenBetterFastSim.Tests` is an xUnit project covering the SecsGemItem binary-save flow. It references the DLLs from the app's `DebugLocal` output, so build the app first:
+
+```bash
+dotnet build EvenBetterFastSim.sln -c DebugLocal
+dotnet test EvenBetterFastSim.Tests
+```
+
 ## Docs
 
 - [README.md](README.md) — user guide

@@ -33,6 +33,7 @@ jobs:
       # release workflow ships. The test project references the app's Release output via a
       # glob, so the app must be built first, as its own dotnet invocation.
       - name: Build app (Release)
+      - name: Build (Release) — same config the release workflow ships
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -44,4 +45,9 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           dotnet test EvenBetterFastSim.Tests/EvenBetterFastSim.Tests.csproj -c Release --verbosity normal
+      - name: Test
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet test EvenBetterFastSim.Tests --no-build --verbosity normal
           if ($LASTEXITCODE -ne 0) { throw "Tests failed" }
