@@ -15,6 +15,15 @@ When modifying SecsGemBase, publish the updated `SecsGemBase.*` packages to nuge
 
 ### Tests
 
+`EvenBetterFastSim.Tests` is an xUnit project covering the SecsGemItem binary-save flow. It validates the **shipping build**, so it references the DLLs from the app's `Release` output (public SecsGemBase NuGet packages, not `DebugLocal`). Build the app in Release first, as its own `dotnet` invocation — the test project's reference glob is expanded at evaluation time and needs the app output to already exist:
+
+```bash
+dotnet build EvenBetterFastSim/EvenBetterFastSim.csproj -c Release
+dotnet test  EvenBetterFastSim.Tests               -c Release
+```
+
+Don't run `dotnet build EvenBetterFastSim.sln` from clean — the test project would evaluate its glob before the app output exists. This is what CI does ([.github/workflows/ci.yml](.github/workflows/ci.yml)).
+
 `EvenBetterFastSim.Tests` is an xUnit project covering the SecsGemItem binary-save flow. It references the DLLs from the app's `DebugLocal` output, so build the app first:
 
 ```bash
