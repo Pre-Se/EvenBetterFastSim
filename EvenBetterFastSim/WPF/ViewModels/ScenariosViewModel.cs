@@ -79,18 +79,25 @@ public partial class ScenariosViewModel : ObservableObject
 
     public ObservableCollection<SecsGemTransaction> AvailableTransactions => libraryManager.Library;
 
+    private readonly Services.IWindowManager windowManager;
+    private readonly Services.ViewModelLocator viewModelLocator;
+
     public ScenariosViewModel(
         ScenarioExecutionService scenarioExecutionService,
         ISecsGemLibraryManager libraryManager,
         DataMessageHandler dataMessageHandler,
         ILogService<LoggedString> logService,
-        ILogger<ScenariosViewModel> logger)
+        ILogger<ScenariosViewModel> logger,
+        Services.IWindowManager windowManager,
+        Services.ViewModelLocator viewModelLocator)
     {
         this.scenarioExecutionService = scenarioExecutionService;
         this.libraryManager = libraryManager;
         this.dataMessageHandler = dataMessageHandler;
         this.logService = logService;
         this.logger = logger;
+        this.windowManager = windowManager;
+        this.viewModelLocator = viewModelLocator;
 
         // Delete key on a focused connector would otherwise call RemoveConnections() and delete
         // all connections from that connector. We handle Delete via InputBindings on NodifyEditor.
@@ -384,6 +391,46 @@ public partial class ScenariosViewModel : ObservableObject
 
         Nodes.Add(node);
         LogInfo($"Added '{transaction.Name}' to scenario");
+    }
+
+    /// <summary>Opens the match-conditions editor for a Receive node.</summary>
+    [RelayCommand]
+    private void EditNodeConditions(ScenarioNodeViewModel? node)
+    {
+        if (node is not { Type: NodeType.Receive }) return;
+        var vm = viewModelLocator.GetViewModel<Responders.NodeResponderViewModel>();
+        vm.InitializeForReceive(node);
+        windowManager.ShowDialog(vm);
+    }
+
+    /// <summary>Opens the response-value editor for a Send node, wired to the nearest upstream Receive.</summary>
+    [RelayCommand]
+    private void EditNodeResponse(ScenarioNodeViewModel? node)
+    {
+        if (node is not { Type: NodeType.Send or NodeType.SendAndWait }) return;
+        var upstream = FindUpstreamReceive(node);
+        var vm = viewModelLocator.GetViewModel<Responders.NodeResponderViewModel>();
+        vm.InitializeForSend(node, upstream?.Transaction, upstream?.UseReplyMessage ?? false);
+        windowManager.ShowDialog(vm);
+    }
+
+    /// <summary>Walks flow edges backwards from <paramref name="start"/> to the first Receive node.</summary>
+    private ScenarioNodeViewModel? FindUpstreamReceive(ScenarioNodeViewModel start)
+    {
+        var visited = new HashSet<string>();
+        var current = start;
+        while (current is not null && visited.Add(current.Id))
+        {
+            var input = current.Input.FirstOrDefault();
+            if (input is null) return null;
+            var connection = Connections.FirstOrDefault(c => c.Target == input);
+            if (connection?.Source is null) return null;
+            var previous = FindNodeForConnector(connection.Source);
+            if (previous is null) return null;
+            if (previous.Type == NodeType.Receive) return previous;
+            current = previous;
+        }
+        return null;
     }
 
     public void AddNodeFromDrop(SecsGemTransaction transaction, Point canvasPosition, bool isPrimary = true)

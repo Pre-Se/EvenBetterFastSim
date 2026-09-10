@@ -4,6 +4,7 @@ using EvenBetterFastSim.Services;
 using EvenBetterFastSim.Services.JSON;
 using EvenBetterFastSim.WPF.LibraryManager;
 using EvenBetterFastSim.WPF.ViewModels;
+using EvenBetterFastSim.WPF.ViewModels.Responders;
 using Logging.Interfaces;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -110,6 +111,7 @@ public partial class App
 
         services.AddScoped<ScenariosViewModel>();
         services.AddScoped<ScenarioExecutionService>();
+        services.AddTransient<NodeResponderViewModel>();
 
         services.AddScoped<IEventBusFactory, EventBusFactory>();
 

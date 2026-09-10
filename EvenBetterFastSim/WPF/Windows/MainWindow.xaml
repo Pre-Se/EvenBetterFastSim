@@ -552,14 +552,58 @@
                                                  Input="{Binding Input}"
                                                  Output="{Binding Output}"
                                                  MinWidth="110">
+                                        <nodify:Node.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="Edit match conditions…"
+                                                          Visibility="{Binding IsReceiveNode, Converter={StaticResource BoolToVis}}"
+                                                          Command="{Binding Source={x:Reference MainWin},
+                                                              Path=DataContext.ScenariosVm.EditNodeConditionsCommand}"
+                                                          CommandParameter="{Binding}" />
+                                                <MenuItem Header="Edit response values…"
+                                                          Visibility="{Binding IsSendNode, Converter={StaticResource BoolToVis}}"
+                                                          Command="{Binding Source={x:Reference MainWin},
+                                                              Path=DataContext.ScenariosVm.EditNodeResponseCommand}"
+                                                          CommandParameter="{Binding}" />
+                                            </ContextMenu>
+                                        </nodify:Node.ContextMenu>
                                         <nodify:Node.Content>
-                                            <Button Command="{Binding ToggleSendModeCommand}"
-                                                    Visibility="{Binding CanToggleMode, Converter={StaticResource BoolToVis}}"
-                                                    Content="{Binding SendModeLabel}"
-                                                    FontSize="9"
-                                                    Padding="4,2"
-                                                    Margin="0,4,0,0"
-                                                    HorizontalAlignment="Center" />
+                                            <StackPanel HorizontalAlignment="Center">
+                                                <Button Command="{Binding ToggleSendModeCommand}"
+                                                        Visibility="{Binding CanToggleMode, Converter={StaticResource BoolToVis}}"
+                                                        Content="{Binding SendModeLabel}"
+                                                        FontSize="9"
+                                                        Padding="4,2"
+                                                        Margin="0,4,0,0"
+                                                        HorizontalAlignment="Center" />
+                                                <TextBlock Text="{Binding ConditionSummary}" FontSize="9" Margin="0,3,0,0"
+                                                           HorizontalAlignment="Center" TextAlignment="Center"
+                                                           Foreground="{DynamicResource SystemAccentColorPrimaryBrush}">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding ConditionSummary}" Value="{x:Null}">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                                <TextBlock Text="{Binding BindingSummary}" FontSize="9" Margin="0,2,0,0"
+                                                           HorizontalAlignment="Center" TextAlignment="Center"
+                                                           Foreground="{DynamicResource SystemAccentColorPrimaryBrush}">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding BindingSummary}" Value="{x:Null}">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </StackPanel>
                                         </nodify:Node.Content>
                                         <nodify:Node.InputConnectorTemplate>
                                             <DataTemplate DataType="{x:Type graph:ConnectorViewModel}">
