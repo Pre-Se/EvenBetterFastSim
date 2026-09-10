@@ -134,6 +134,17 @@ public partial class ScenariosViewModel : ObservableObject
     private void LogError(string message) =>
         logService.LogMessages.Add(new LoggedString { Level = LogLevel.Error, Message = message });
 
+    /// <summary>
+    /// When a run is cancelled while a Receive/Wait step is still pending, the execution service
+    /// reports that step as a timeout (e.g. "Timed out waiting to receive 'S6F11'"). Turn that into
+    /// a " waiting ..." suffix so the log reads "cancelled by the user waiting to receive 'S6F11'"
+    /// instead of a spurious "failed: Timed out".
+    /// </summary>
+    private static string CancelledWhileDetail(string? errorMessage) =>
+        errorMessage is not null && errorMessage.StartsWith("Timed out waiting", StringComparison.OrdinalIgnoreCase)
+            ? " " + errorMessage["Timed out ".Length..]
+            : string.Empty;
+
     partial void OnSelectedScenarioChanged(ScenarioListItem? value)
     {
         if (value != null)
@@ -255,7 +266,7 @@ public partial class ScenariosViewModel : ObservableObject
 
         // One shared set for the whole loop session: a message the equipment sent once can satisfy
         // only one Receive across all iterations, so a single trigger doesn't re-fire every loop.
-        var consumed = new HashSet<global::Logging.Interfaces.ILoggedDataMessage>(ReferenceEqualityComparer.Instance);
+        var consumed = new System.Collections.Concurrent.ConcurrentDictionary<global::Logging.Interfaces.ILoggedDataMessage, byte>(ReferenceEqualityComparer.Instance);
 
         LogInfo($"Loop started for '{scenario.Name}' — it restarts from Start after each finish.");
         try
@@ -281,7 +292,7 @@ public partial class ScenariosViewModel : ObservableObject
     private async Task RunOnceAsync(
         ScenarioListItem scenario,
         bool isLoopIteration,
-        HashSet<global::Logging.Interfaces.ILoggedDataMessage>? consumed,
+        System.Collections.Concurrent.ConcurrentDictionary<global::Logging.Interfaces.ILoggedDataMessage, byte>? consumed,
         CancellationToken token)
     {
         try
@@ -296,17 +307,32 @@ public partial class ScenariosViewModel : ObservableObject
             if (!isLoopIteration)
                 LogInfo($"Starting scenario '{scenario.Name}'...");
 
+            // Canvas feedback: highlight the node currently running / stuck waiting.
+            var canvasNodes = scenario.CachedNodes;
+            if (canvasNodes != null)
+                foreach (var n in canvasNodes) { n.RunState = ScenarioNodeRunState.Idle; n.RunDetail = null; }
+
+            IProgress<ScenarioNodeProgress>? progress = canvasNodes is null ? null
+                : new Progress<ScenarioNodeProgress>(p =>
+                {
+                    if (canvasNodes.FirstOrDefault(n => n.Id == p.NodeId) is not { } vm) return;
+                    vm.RunState = p.State;
+                    vm.RunDetail = p.Detail;
+                });
+
             TimeSpan? deadline = RunTimeoutSeconds > 0 ? TimeSpan.FromSeconds(RunTimeoutSeconds) : null;
-            var result = await scenarioExecutionService.ExecuteAsync(graph, token, consumed, deadline);
+            var result = await scenarioExecutionService.ExecuteAsync(graph, token, consumed, deadline, progress);
 
             if (result.Success)
                 LogInfo($"Scenario '{scenario.Name}' completed ({result.CompletedSteps} steps)");
+            else if (token.IsCancellationRequested)
+                LogInfo($"Scenario '{scenario.Name}' cancelled by the user{CancelledWhileDetail(result.ErrorMessage)}");
             else
                 LogError($"Scenario '{scenario.Name}' failed: {result.ErrorMessage}");
         }
         catch (OperationCanceledException)
         {
-            LogInfo($"Scenario '{scenario.Name}' cancelled");
+            LogInfo($"Scenario '{scenario.Name}' cancelled by the user");
         }
         catch (Exception ex)
         {
@@ -522,7 +548,7 @@ public partial class ScenariosViewModel : ObservableObject
             }
             case NodeType.Send or NodeType.SendAndWait:
             {
-                var upstreams = BuildUpstreamReceives(node);
+                var upstreams = BuildUpstreamMessages(node);
                 var vm = viewModelLocator.GetViewModel<Responders.NodeResponderViewModel>();
                 vm.InitializeForSend(node, upstreams);
                 windowManager.ShowDialog(vm);
@@ -537,42 +563,52 @@ public partial class ScenariosViewModel : ObservableObject
         OpenNodeEditor(SelectedNodes.Count == 1 ? SelectedNodes[0] : null);
 
     /// <summary>
-    /// Walks flow edges backwards from <paramref name="start"/> collecting every Receive node on the
-    /// path (earliest first), each as a value source the response editor can pull parameters from.
+    /// Walks flow edges backwards from <paramref name="start"/> through <b>every</b> incoming branch
+    /// (so a fork joined by an AND contributes all its steps), collecting each Receive <b>and</b> Send
+    /// node as a value source the response editor can pull parameters from.
     /// </summary>
-    private IReadOnlyList<Responders.UpstreamReceive> BuildUpstreamReceives(ScenarioNodeViewModel start)
+    private IReadOnlyList<Responders.UpstreamMessage> BuildUpstreamMessages(ScenarioNodeViewModel start)
     {
-        var receives = new List<ScenarioNodeViewModel>();
-        var visited = new HashSet<string>();
-        var current = start;
+        var sources = new List<ScenarioNodeViewModel>();
+        var visited = new HashSet<string> { start.Id };
+        var queue = new Queue<ScenarioNodeViewModel>();
+        queue.Enqueue(start);
 
-        while (current is not null && visited.Add(current.Id))
+        while (queue.Count > 0)
         {
-            var input = current.Input.FirstOrDefault();
-            if (input is null) break;
-            var connection = Connections.FirstOrDefault(c => c.Target == input);
-            if (connection?.Source is null) break;
-            var previous = FindNodeForConnector(connection.Source);
-            if (previous is null) break;
-            if (previous.Type == NodeType.Receive)
-                receives.Add(previous);
-            current = previous;
+            var node = queue.Dequeue();
+            foreach (var connection in Connections.Where(c => c.Target != null && node.Input.Contains(c.Target)))
+            {
+                if (connection.Source is null) continue;
+                var previous = FindNodeForConnector(connection.Source);
+                if (previous is null || !visited.Add(previous.Id)) continue;
+                if (previous.Type is NodeType.Receive or NodeType.Send or NodeType.SendAndWait)
+                    sources.Add(previous);
+                queue.Enqueue(previous); // keep walking back through every node
+            }
         }
 
-        receives.Reverse(); // chain order
+        // Stable left-to-right order so the picker reads like the canvas.
+        sources.Sort((a, b) => a.Location.X.CompareTo(b.Location.X));
 
-        var result = new List<Responders.UpstreamReceive>();
-        var nameCounts = new Dictionary<string, int>();
-        foreach (var receive in receives)
+        var result = new List<Responders.UpstreamMessage>();
+        var labelCounts = new Dictionary<string, int>();
+        foreach (var src in sources)
         {
-            if (receive.Transaction is null) continue;
-            var source = receive.UseReplyMessage ? receive.Transaction.ReplyMessage : receive.Transaction.PrimaryMessage;
+            if (src.Transaction is null) continue;
 
-            nameCounts.TryGetValue(source.Name, out var seen);
-            nameCounts[source.Name] = seen + 1;
-            var label = seen == 0 ? source.Name : $"{source.Name} #{seen + 1}";
+            var isSend = src.Type is NodeType.Send or NodeType.SendAndWait;
+            var message = src.UseReplyMessage ? src.Transaction.ReplyMessage : src.Transaction.PrimaryMessage;
 
-            result.Add(new Responders.UpstreamReceive(receive.Id, label, (SecsGemDataMessage)source.Clone()));
+            var label = (isSend ? "→ " : "← ") + message.Name;
+            if (!isSend && !string.IsNullOrEmpty(src.ConditionSummary))
+                label += $"  ({src.ConditionSummary})";     // distinguish same-type receives by their condition
+            labelCounts.TryGetValue(label, out var seen);
+            labelCounts[label] = seen + 1;
+            if (seen > 0)
+                label += $" #{seen + 1}";
+
+            result.Add(new Responders.UpstreamMessage(src.Id, label, (SecsGemDataMessage)message.Clone()));
         }
         return result;
     }

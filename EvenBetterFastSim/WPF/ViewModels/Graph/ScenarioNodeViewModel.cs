@@ -65,6 +65,14 @@ public partial class ScenarioNodeViewModel : ObservableObject
     partial void OnMatchConditionsJsonChanged(string? value) => OnPropertyChanged(nameof(ConditionSummary));
     partial void OnResponseBindingsJsonChanged(string? value) => OnPropertyChanged(nameof(BindingSummary));
 
+    /// <summary>Live state while a scenario runs (drives the node's highlight on the canvas).</summary>
+    [ObservableProperty]
+    public partial ScenarioNodeRunState RunState { get; set; }
+
+    /// <summary>e.g. "waiting for S6F11" — shown on the node while it's the current/stuck step.</summary>
+    [ObservableProperty]
+    public partial string? RunDetail { get; set; }
+
     public bool CanToggleMode => Type is NodeType.Send or NodeType.SendAndWait or NodeType.Receive;
 
     /// <summary>Receive node — can carry match conditions on the incoming message.</summary>

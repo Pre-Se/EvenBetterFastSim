@@ -607,6 +607,25 @@
                                                         <Setter Property="HeaderBrush" Value="#8957E5" />
                                                         <Setter Property="BorderBrush" Value="#8957E5" />
                                                     </DataTrigger>
+
+                                                    <!-- Live run state overrides the role colour for the current / stuck node. -->
+                                                    <DataTrigger Binding="{Binding RunState}" Value="Running">
+                                                        <Setter Property="HeaderBrush" Value="#2F81F7" />
+                                                        <Setter Property="BorderBrush" Value="#2F81F7" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding RunState}" Value="Waiting">
+                                                        <Setter Property="HeaderBrush" Value="#D29922" />
+                                                        <Setter Property="BorderBrush" Value="#D29922" />
+                                                        <Setter Property="BorderThickness" Value="2" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding RunState}" Value="Failed">
+                                                        <Setter Property="HeaderBrush" Value="#F85149" />
+                                                        <Setter Property="BorderBrush" Value="#F85149" />
+                                                        <Setter Property="BorderThickness" Value="2" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding RunState}" Value="Succeeded">
+                                                        <Setter Property="BorderBrush" Value="#3FB950" />
+                                                    </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
                                         </nodify:Node.Style>
@@ -642,6 +661,23 @@
                                                             <Style.Triggers>
                                                                 <DataTrigger Binding="{Binding BindingSummary}" Value="{x:Null}">
                                                                     <Setter Property="Visibility" Value="Collapsed" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                                <TextBlock Text="{Binding RunDetail}" FontSize="9" FontWeight="SemiBold"
+                                                           Margin="0,3,0,0" HorizontalAlignment="Center" TextAlignment="Center"
+                                                           TextWrapping="Wrap" Foreground="#D29922">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding RunDetail}" Value="{x:Null}">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding RunState}" Value="Failed">
+                                                                    <Setter Property="Foreground" Value="#F85149" />
                                                                 </DataTrigger>
                                                             </Style.Triggers>
                                                         </Style>

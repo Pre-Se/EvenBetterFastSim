@@ -19,8 +19,8 @@ public enum NodeResponderMode
     Bindings
 }
 
-/// <summary>An upstream Receive node offered as a value source: its id, a display label, and a clone of its message shape.</summary>
-public sealed record UpstreamReceive(string NodeId, string Label, SecsGemDataMessage Message);
+/// <summary>An upstream node (Receive or Send) offered as a value source: its id, a display label, and a clone of its message shape.</summary>
+public sealed record UpstreamMessage(string NodeId, string Label, SecsGemDataMessage Message);
 
 /// <summary>
 /// One dialog, two faces. For a Receive node it edits the match conditions that gate the step;
@@ -76,7 +76,7 @@ public partial class NodeResponderViewModel : ObservableObject, IBaseViewModel
         OnPropertyChanged(nameof(IsBindings));
     }
 
-    public void InitializeForSend(ScenarioNodeViewModel sendNode, IReadOnlyList<UpstreamReceive> upstreamReceives)
+    public void InitializeForSend(ScenarioNodeViewModel sendNode, IReadOnlyList<UpstreamMessage> upstreamMessages)
     {
         node = sendNode;
         Mode = NodeResponderMode.Bindings;
@@ -84,7 +84,7 @@ public partial class NodeResponderViewModel : ObservableObject, IBaseViewModel
         var outgoing = sendNode.Transaction?.PrimaryMessage;
         HeaderText = $"Response values — {outgoing?.Name ?? sendNode.Title}";
 
-        foreach (var upstream in upstreamReceives)
+        foreach (var upstream in upstreamMessages)
         {
             triggerShapes[upstream.NodeId] = upstream.Message;
             SourceMessages.Add(new UpstreamMessageOption(upstream.NodeId, upstream.Label));
@@ -100,7 +100,7 @@ public partial class NodeResponderViewModel : ObservableObject, IBaseViewModel
             parametersByNode[upstream.NodeId] = parameters;
         }
 
-        SubtitleText = upstreamReceives.Count == 0
+        SubtitleText = upstreamMessages.Count == 0
             ? "No upstream Receive on this path — you can still set fixed values."
             : "Echo / Copy branch: pick a received message, then the parameter inside it.";
 
