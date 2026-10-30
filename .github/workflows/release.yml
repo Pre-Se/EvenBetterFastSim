@@ -39,7 +39,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          dotnet tool install --global nbgv --version 3.9.50
+          dotnet tool install --global nbgv --version 3.10.94   # same as the Nerdbank.GitVersioning package in the csproj files
           $env:PATH = "$env:USERPROFILE\.dotnet\tools;$env:PATH"
           $semver = nbgv get-version --variable SemVer2
           if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($semver)) { throw "nbgv failed to produce a version" }
