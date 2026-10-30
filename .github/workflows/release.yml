@@ -49,6 +49,22 @@ jobs:
           "zipasset=EvenBetterFastSim-$semver.zip" >> $env:GITHUB_OUTPUT
           Write-Host "Version: $semver"
 
+      # Publish only what passes the tests: the same Release build and test run as ci.yml
+      # (this workflow does not wait for the CI run of the same push).
+      - name: Build app (Release)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet build EvenBetterFastSim/EvenBetterFastSim.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw "Release build failed" }
+
+      - name: Test (Release)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet test EvenBetterFastSim.Tests/EvenBetterFastSim.Tests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw "Tests failed" }
+
       - name: Publish single-file exe
         shell: pwsh
         run: |
