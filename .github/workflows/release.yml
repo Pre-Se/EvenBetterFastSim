@@ -89,6 +89,23 @@ jobs:
           Compress-Archive -Path staging/* -DestinationPath "${{ steps.version.outputs.zipasset }}"
           if ($LASTEXITCODE -ne 0) { throw "zip failed" }
 
+      # The self-contained exe carries its own .NET runtime: the newest patch this SDK knows,
+      # fixed until the next release. Record which one (the restore of the publish step lists
+      # the runtime packs); informational only, it never blocks the release.
+      - name: Show bundled runtime version
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $assets = Get-Content EvenBetterFastSim/obj/project.assets.json -Raw | ConvertFrom-Json
+          $packs = @($assets.project.frameworks.PSObject.Properties.Value.downloadDependencies |
+            Where-Object { $_.name -in 'Microsoft.NETCore.App.Runtime.win-x64', 'Microsoft.WindowsDesktop.App.Runtime.win-x64' })
+          if ($packs.Count -eq 0) { throw "No runtime pack found in EvenBetterFastSim/obj/project.assets.json" }
+          $lines = @("SDK $(dotnet --version)") + ($packs | ForEach-Object { "$($_.name) $($_.version)" })
+          $lines | ForEach-Object { Write-Host $_ }
+          "### Bundled .NET runtime" >> $env:GITHUB_STEP_SUMMARY
+          $lines | ForEach-Object { "- $_" } >> $env:GITHUB_STEP_SUMMARY
+
       - name: Create / update GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
