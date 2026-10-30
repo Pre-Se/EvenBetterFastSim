@@ -25,12 +25,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0            # Nerdbank.GitVersioning needs full history
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
 
@@ -39,7 +39,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          dotnet tool install --global nbgv --version 3.9.50
+          dotnet tool install --global nbgv --version 3.10.94   # same as the Nerdbank.GitVersioning package in the csproj files
           $env:PATH = "$env:USERPROFILE\.dotnet\tools;$env:PATH"
           $semver = nbgv get-version --variable SemVer2
           if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($semver)) { throw "nbgv failed to produce a version" }
@@ -48,6 +48,22 @@ jobs:
           "asset=EvenBetterFastSim-$semver.exe"  >> $env:GITHUB_OUTPUT
           "zipasset=EvenBetterFastSim-$semver.zip" >> $env:GITHUB_OUTPUT
           Write-Host "Version: $semver"
+
+      # Publish only what passes the tests: the same Release build and test run as ci.yml
+      # (this workflow does not wait for the CI run of the same push).
+      - name: Build app (Release)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet build EvenBetterFastSim/EvenBetterFastSim.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw "Release build failed" }
+
+      - name: Test (Release)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet test EvenBetterFastSim.Tests/EvenBetterFastSim.Tests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw "Tests failed" }
 
       - name: Publish single-file exe
         shell: pwsh
@@ -72,6 +88,23 @@ jobs:
           Copy-Item publish/Library/DefaultLibrary.msgpack staging/Library/
           Compress-Archive -Path staging/* -DestinationPath "${{ steps.version.outputs.zipasset }}"
           if ($LASTEXITCODE -ne 0) { throw "zip failed" }
+
+      # The self-contained exe carries its own .NET runtime: the newest patch this SDK knows,
+      # fixed until the next release. Record which one (the restore of the publish step lists
+      # the runtime packs); informational only, it never blocks the release.
+      - name: Show bundled runtime version
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $assets = Get-Content EvenBetterFastSim/obj/project.assets.json -Raw | ConvertFrom-Json
+          $packs = @($assets.project.frameworks.PSObject.Properties.Value.downloadDependencies |
+            Where-Object { $_.name -in 'Microsoft.NETCore.App.Runtime.win-x64', 'Microsoft.WindowsDesktop.App.Runtime.win-x64' })
+          if ($packs.Count -eq 0) { throw "No runtime pack found in EvenBetterFastSim/obj/project.assets.json" }
+          $lines = @("SDK $(dotnet --version)") + ($packs | ForEach-Object { "$($_.name) $($_.version)" })
+          $lines | ForEach-Object { Write-Host $_ }
+          "### Bundled .NET runtime" >> $env:GITHUB_STEP_SUMMARY
+          $lines | ForEach-Object { "- $_" } >> $env:GITHUB_STEP_SUMMARY
 
       - name: Create / update GitHub Release
         env:
