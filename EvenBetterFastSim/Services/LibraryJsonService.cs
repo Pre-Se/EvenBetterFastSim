@@ -120,7 +120,7 @@ public class LibraryJsonService(ILogger<LibraryJsonService> logger)
         }
         catch (JsonException ex)
         {
-            logger.LogError("Failed to load library from \"{Path}\": file is invalid", path);
+            logger.LogError(ex, "Failed to load library from \"{Path}\": file is invalid", path);
             return [];
         }
     }

@@ -118,7 +118,7 @@ internal partial class SecsGemLibraryManager : ObservableObject, ISecsGemLibrary
             }
             catch (XmlException ex)
             {
-                Logger.LogError("Failed to load library from \"{Path}\": file is invalid", path);
+                Logger.LogError(ex, "Failed to load library from \"{Path}\": file is invalid", path);
             }
         }
     }

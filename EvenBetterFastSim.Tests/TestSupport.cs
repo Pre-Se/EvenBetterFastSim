@@ -6,6 +6,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using EvenBetterFastSim.Services;
 using EvenBetterFastSim.WPF.ViewModels;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using SecsGemBaseItems.Data_Containers;
 using SecsGemBaseItems.Data_Containers.Interfaces;
@@ -14,7 +15,8 @@ using SecsGemBaseItems.LibraryManager;
 namespace EvenBetterFastSim.Tests;
 
 /// <summary>
-/// Minimal fake; <see cref="SecsGemItemViewModel"/> only reads <see cref="SelectedItem"/>.
+/// Minimal fake; <see cref="SecsGemItemViewModel"/> reads <see cref="SelectedItem"/> and replaces it when an
+/// item without a parent changes its type.
 /// </summary>
 internal sealed class FakeLibraryManager : ISecsGemLibraryManager
 {
@@ -25,19 +27,38 @@ internal sealed class FakeLibraryManager : ISecsGemLibraryManager
     public event PropertyChangedEventHandler? PropertyChanged { add { } remove { } }
 }
 
+/// <summary>
+/// Records every log call, so a test can check the level and the attached exception.
+/// </summary>
+internal sealed class ListLogger<T> : ILogger<T>
+{
+    public List<(LogLevel Level, Exception? Exception, string Message)> Entries { get; } = [];
+    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+    public bool IsEnabled(LogLevel logLevel) => true;
+
+    public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+        Func<TState, Exception?, string> formatter) =>
+        Entries.Add((logLevel, exception, formatter(state, exception)));
+}
+
 internal static class Editor
 {
     /// <summary>
     /// Builds a <see cref="SecsGemItemViewModel"/> editing <paramref name="item"/>, exactly as the
     /// "Modify Item" dialog does when that item is selected in the tree.
     /// </summary>
-    public static (SecsGemItemViewModel vm, FakeLibraryManager lib) Open(SecsGemItem item)
+    public static (SecsGemItemViewModel vm, FakeLibraryManager lib) Open(SecsGemItem item) => OpenWithSelection(item);
+
+    /// <summary>
+    /// Like <see cref="Open"/>, but the selected tree item may be anything, including nothing.
+    /// </summary>
+    public static (SecsGemItemViewModel vm, FakeLibraryManager lib) OpenWithSelection(IDataItem? selectedItem)
     {
         // ApplicationSettings' ctor needs 3 services; the view model only touches ItemDelimiter.
         var settings = (ApplicationSettings)RuntimeHelpers.GetUninitializedObject(typeof(ApplicationSettings));
         settings.ItemDelimiter = ";";
 
-        var lib = new FakeLibraryManager { SelectedItem = item };
+        var lib = new FakeLibraryManager { SelectedItem = selectedItem };
         var vm = new SecsGemItemViewModel(settings, lib, NullLogger<SecsGemItemViewModel>.Instance);
         return (vm, lib);
     }

@@ -99,6 +99,13 @@ public partial class SecsGemItemViewModel : ObservableObject, IBaseViewModel
     [RelayCommand(CanExecute = nameof(CanSaveChanges))]
     private void AcceptButtonClick()
     {
+        // The constructor found no SecsGemItem to edit (already logged), so there is nothing to save.
+        if (originalItem is null)
+        {
+            CloseAction?.Invoke();
+            return;
+        }
+
         if (HasBinaryHexError)
         {
             submitAttempted = true;
