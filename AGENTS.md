@@ -11,7 +11,7 @@ dotnet run --project EvenBetterFastSim/EvenBetterFastSim.csproj
 
 Configurations: `Debug` and `Release` (use the `SecsGemBase.MessageHandling` / `SecsGemBase.ScenarioEngine` pre-release NuGet packages from nuget.org), `DebugLocal` (uses SecsGemBase DLLs from `%USERPROFILE%\source\repos\SecsGemBase\`).
 
-No linter, no typecheck. Tests: `EvenBetterFastSim.Tests` (xUnit) — build the app first, then test:
+No linter, no typecheck. Tests: `EvenBetterFastSim.Tests` (xUnit v3 via VSTest, package `xunit.v3.mtp-off`) — build the app first, then test:
 
 ```bash
 dotnet build EvenBetterFastSim.sln -c DebugLocal
