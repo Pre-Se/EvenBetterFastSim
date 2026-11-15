@@ -4,6 +4,8 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Windows.Threading;
 using EvenBetterFastSim.Services;
 using EvenBetterFastSim.WPF.ViewModels;
 using Microsoft.Extensions.Logging;
@@ -97,5 +99,43 @@ internal static class TestPaths
         }
         throw new DirectoryNotFoundException(
             @"Could not locate 'EvenBetterFastSim\Library' above " + AppContext.BaseDirectory);
+    }
+}
+
+/// <summary>A thread with a running <see cref="Dispatcher"/>, like the WPF UI thread.</summary>
+internal sealed class UiThread : IDisposable
+{
+    private readonly Thread thread;
+
+    public UiThread()
+    {
+        using var started = new ManualResetEventSlim();
+        Dispatcher? dispatcher = null;
+        thread = new Thread(() =>
+        {
+            dispatcher = Dispatcher.CurrentDispatcher;
+            started.Set();
+            Dispatcher.Run();
+        }) { IsBackground = true, Name = "test UI thread" };
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        if (!started.Wait(TimeSpan.FromSeconds(10))) throw new TimeoutException("The dispatcher thread did not start");
+        Dispatcher = dispatcher!;
+        ThreadId = thread.ManagedThreadId;
+    }
+
+    public Dispatcher Dispatcher { get; }
+    public int ThreadId { get; }
+
+    /// <summary>
+    /// Runs on the UI thread once everything queued so far is done. A plain Invoke has the priority Send and
+    /// overtakes queued work such as log entries.
+    /// </summary>
+    public T AfterQueuedWork<T>(Func<T> read) => Dispatcher.Invoke(read, DispatcherPriority.ContextIdle);
+
+    public void Dispose()
+    {
+        Dispatcher.InvokeShutdown();
+        thread.Join(TimeSpan.FromSeconds(10));
     }
 }

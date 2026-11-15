@@ -11,8 +11,6 @@ using System.Windows;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using EvenBetterFastSim.Logging;
-using EvenBetterFastSim.Logging.Interfaces;
 using EvenBetterFastSim.WPF.ViewModels.Graph;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
@@ -50,7 +48,6 @@ public partial class ScenariosViewModel : ObservableObject
     private readonly ScenarioExecutionService scenarioExecutionService;
     private readonly ISecsGemLibraryManager libraryManager;
     private readonly DataMessageHandler dataMessageHandler;
-    private readonly ILogService<LoggedString> logService;
     private readonly ILogger<ScenariosViewModel> logger;
 
     [ObservableProperty]
@@ -90,7 +87,6 @@ public partial class ScenariosViewModel : ObservableObject
         ScenarioExecutionService scenarioExecutionService,
         ISecsGemLibraryManager libraryManager,
         DataMessageHandler dataMessageHandler,
-        ILogService<LoggedString> logService,
         ILogger<ScenariosViewModel> logger,
         Services.IWindowManager windowManager,
         Services.ViewModelLocator viewModelLocator)
@@ -98,7 +94,6 @@ public partial class ScenariosViewModel : ObservableObject
         this.scenarioExecutionService = scenarioExecutionService;
         this.libraryManager = libraryManager;
         this.dataMessageHandler = dataMessageHandler;
-        this.logService = logService;
         this.logger = logger;
         this.windowManager = windowManager;
         this.viewModelLocator = viewModelLocator;
@@ -128,11 +123,12 @@ public partial class ScenariosViewModel : ObservableObject
         LoadFromJson();
     }
 
-    private void LogInfo(string message) =>
-        logService.LogMessages.Add(new LoggedString { Level = LogLevel.Information, Message = message });
+    // Through the logger, like every other System Log entry: the logger queues its entries for the UI thread, and a line
+    // added to the collection directly would overtake engine entries that are still queued (after a cancel the line
+    // "cancelled by the user" came before the engine's "was cancelled"; GitLab secsgem/evencoolerfastsim#26).
+    private void LogInfo(string message) => logger.LogInformation("{Message}", message);
 
-    private void LogError(string message) =>
-        logService.LogMessages.Add(new LoggedString { Level = LogLevel.Error, Message = message });
+    private void LogError(string message) => logger.LogError("{Message}", message);
 
     /// <summary>
     /// When a run is cancelled while a Receive/Wait step is still pending, the execution service
@@ -324,12 +320,17 @@ public partial class ScenariosViewModel : ObservableObject
                 : new Progress<ScenarioNodeProgress>(p =>
                 {
                     if (canvasNodes.FirstOrDefault(n => n.Id == p.NodeId) is not { } vm) return;
+                    if (Services.ScenarioRun.IsStale(vm.RunState, p)) return;
                     vm.RunState = p.State;
                     vm.RunDetail = p.Detail;
                 });
 
             TimeSpan? deadline = RunTimeoutSeconds > 0 ? TimeSpan.FromSeconds(RunTimeoutSeconds) : null;
-            var result = await scenarioExecutionService.ExecuteAsync(graph, token, consumed, deadline, progress);
+            // The engine runs on the thread pool, so node timing does not depend on the UI and a blocking node cannot
+            // freeze it (GitLab secsgem/evencoolerfastsim#26). It gets its own copy of the graph, taken here on the UI
+            // thread; this method continues on the UI thread after the await.
+            var result = await Services.ScenarioRun.RunAsync(
+                scenarioExecutionService, graph, libraryManager.Library, token, consumed, deadline, progress);
 
             if (result.Success)
                 LogInfo($"Scenario '{scenario.Name}' completed ({result.CompletedSteps} steps)");
