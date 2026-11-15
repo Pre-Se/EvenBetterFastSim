@@ -2,6 +2,29 @@
 
 Related docs: [project_overview.md](project_overview.md), [secsgembase_library.md](secsgembase_library.md), [dialog_pattern.md](dialog_pattern.md), [SESSION_REFACTORING_LOG.md](../SESSION_REFACTORING_LOG.md)
 
+## Scenario runs leave the UI thread
+
+A scenario (Run or a loop) now executes on the thread pool. Until then every node ran on the WPF UI thread, because
+the engine awaits without `ConfigureAwait(false)`: the time between two nodes depended on what the UI was busy with,
+and a node that blocks froze the window (internal board, issue 26).
+
+**Files:** `Services/ScenarioRun.cs` (`RunAsync`, `Snapshot`, `IsStale`), `WPF/ViewModels/ScenariosViewModel.cs`
+(`RunOnceAsync`, `LogInfo`/`LogError`), `Logging/ObservableLogger.cs`.
+
+- `ScenarioRun.RunAsync` takes a `Snapshot` of the graph on the UI thread and starts the engine with `Task.Run`.
+  `RunOnceAsync` continues on the UI thread after the await; the `Progress<T>` for the canvas is created there.
+- The snapshot is a copy nothing else refers to. The stored graph changes on the UI thread during a run (opening a
+  scenario clears `TransactionJson` of its nodes), and a node from an older file that only names its transaction gets
+  a copy of the library transaction, so the engine does not read or write the UI-bound library for it. That copy is
+  written with the invariant culture (the SecsGemBase converter otherwise turns 1,5 into 15 on a decimal-comma system).
+- The System Log logger (`ObservableLogger`) queues its entries with `Dispatcher.InvokeAsync`, like
+  `SecsMessageLogger`, instead of waiting for the UI thread. `ScenariosViewModel` writes its own lines through the
+  logger too, so they keep their place between the engine's lines. Without a dispatcher (unit tests, shutdown) an
+  entry is dropped; pass a dispatcher provider as third constructor argument to observe entries in a test.
+- Two things the engine did not need on a single thread: runs enter the engine one at a time (it keeps the run's
+  cancellation source in a field while it starts), and an And node's late "1/2 branches" report no longer replaces
+  its Succeeded state.
+
 ## Responder panel — edit the message shape
 
 The node responder dialog (`NodeResponderView`, opened by double-click on a Send / Receive node) now has a
