@@ -553,7 +553,7 @@ public partial class ScenariosViewModel : ObservableObject
 
     /// <summary>
     /// Opens the editor for a node: match conditions for a Receive node, response values for a
-    /// Send node. Invoked by right-click / double-click / Enter on the canvas.
+    /// Send node, the time for a Wait node. Invoked by right-click / double-click / Enter on the canvas.
     /// </summary>
     [RelayCommand]
     private void OpenNodeEditor(ScenarioNodeViewModel? node)
@@ -573,6 +573,13 @@ public partial class ScenariosViewModel : ObservableObject
                 var vm = viewModelLocator.GetViewModel<Responders.NodeResponderViewModel>();
                 vm.InitializeForSend(node, upstreams);
                 windowManager.ShowDialog(vm);
+                break;
+            }
+            case NodeType.Wait:
+            {
+                var vm = NodeMillisecondsViewModel.ForWait(node);
+                windowManager.ShowDialog(vm);
+                vm.ApplyTo(node);
                 break;
             }
         }
@@ -637,12 +644,7 @@ public partial class ScenariosViewModel : ObservableObject
     /// <summary>Drops a structural node (e.g. an AND join) at the given canvas point.</summary>
     public void AddStructuralNode(NodeType type, Point canvasPosition)
     {
-        var node = new ScenarioNodeViewModel
-        {
-            Type = type,
-            Location = canvasPosition
-        };
-        Nodes.Add(node);
+        Nodes.Add(ScenarioNodeViewModel.CreateStructural(type, canvasPosition));
         LogInfo($"Added {type} node to scenario");
     }
 

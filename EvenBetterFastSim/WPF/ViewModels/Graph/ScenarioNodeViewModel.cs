@@ -95,6 +95,17 @@ public partial class ScenarioNodeViewModel : ObservableObject
     /// <summary>Start and End are structural — they can't be deleted from the canvas.</summary>
     public bool IsDeletable => Type is not (NodeType.Start or NodeType.End);
 
+    /// <summary>
+    /// A node dragged from the palette (And, Wait). A Wait node starts with
+    /// <see cref="WaitTime.DefaultMilliseconds"/>; double-click it to change the time.
+    /// </summary>
+    public static ScenarioNodeViewModel CreateStructural(NodeType type, Point location) => new()
+    {
+        Type = type,
+        TransactionName = type == NodeType.Wait ? WaitTime.Format(WaitTime.DefaultMilliseconds) : null,
+        Location = location
+    };
+
     public ScenarioNodeViewModel()
     {
         InitializeConnectors();
@@ -179,7 +190,7 @@ public partial class ScenarioNodeViewModel : ObservableObject
             NodeType.SendAndWait => label ?? "Send & Wait",
             NodeType.Send => label ?? "Send",
             NodeType.Condition => label ?? "If",
-            NodeType.Wait => label ?? "Wait",
+            NodeType.Wait => WaitTime.Title(TransactionName),
             NodeType.Receive => label ?? "Receive",
             NodeType.And => "AND",
             _ => label ?? Type.ToString()
