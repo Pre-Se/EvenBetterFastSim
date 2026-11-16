@@ -8,6 +8,7 @@ and exchange HSMS/SECS-II messages manually or create your own scripted scenario
 - HSMS (TCP/IP) communication with a live, timestamped message log
 - An editable SECS/GEM message library loaded from XML (S1F1, S1F3, S2Fx, S6F11, …)
 - Simulate workflows with multiple responses to a message using the **Scenario** canvas
+- Simulate a connection loss at a chosen point of a scenario (TCP reset, port closed for a set time)
 - Create and define equipment events, reports and variables, and fire them as S6F11
 - Run **multiple instances at once** (e.g. a Passive + Active pair) that talk to each other
 - Control-state model (Online/Offline, Local/Remote) and configurable HSMS timers (T3–T8)
@@ -104,6 +105,45 @@ waits until the message arrives or you press **Cancel**) and **Wait** (a fixed d
 a Receive node after the Send node. Drag **WAIT** from the **NODES** palette onto the canvas and double-click
 the node to set its time in milliseconds; the node shows it as "Wait 1500 ms".
 Scenarios are saved per instance and can be exported / imported.
+
+#### Simulating a connection loss
+
+Two more nodes in the **NODES** palette drop the connection at a chosen point of a scenario and wait for it to
+come back:
+
+- **Drop connection** aborts the connection with a TCP reset (RST). Its value is the downtime in milliseconds:
+  the port stays closed that long and is then opened again. With 0 a new connection is set up right away.
+- **Wait for communication** waits until data messages can be exchanged again (HSMS **Selected** and Comms
+  **Established** in the status bar). Its value is the timeout in milliseconds; with 0 it waits as long as the
+  run may take.
+
+Double-click a node to set its value. Both nodes have two outputs, the upper for success and the lower for
+failure: Drop connection fails when there is no connection to drop, Wait for communication when its timeout is
+over. A failure with no wire on the lower output ends the run.
+
+A typical scenario: **Start → Receive** S6F11 (with a condition on the CEID) **→ Drop connection** 5000
+**→ Wait for communication** 20000 **→ Receive** S6F11 **→ Send** S6F12 as the reply **→ End**.
+
+What to expect:
+
+- **How long the outage lasts.** The other side sees at least the downtime. The connection comes back with the
+  next attempt of the active side; after a refused attempt that is its T5 later (10 s by default). The outage
+  lasts exactly the downtime only when this instance is the active side. With 0 on the active side the first
+  attempt can still be refused, when the other side needs a moment before it listens again.
+- **A reset, not a pulled cable.** The other side learns at once that the connection is gone. For a silent
+  loss, put a firewall rule or a TCP proxy between the two.
+- **After the connection is back** about a second passes before messages can be sent (select, then
+  S1F13/S1F14). A Send node fails during that time (unless **Ignore HSMS State** is ticked in
+  Connection ▸ Properties), so put Wait for communication in front of it.
+- **Replies from the library.** While a scenario with a Receive node runs, the library does not answer that
+  node's Stream/Function by itself, whatever the condition of the node. Send the reply in the scenario.
+- **Replies from the stack** (S1F14, S1F4, S2F34/36/38 and others) are not held back. Whether one that is due
+  right before the drop still goes out is not guaranteed.
+- **One connection for all scenarios.** A drop in one running scenario hits the others too.
+- **Connect button.** While a Drop connection node keeps the port closed, the button is disabled. Cancel the
+  run to open the port at once.
+- **Older versions of the app** do not know these two nodes. They cannot run them, and saving the scenario
+  there drops the wires on their failure outputs.
 
 ### 7. Two instances talking
 

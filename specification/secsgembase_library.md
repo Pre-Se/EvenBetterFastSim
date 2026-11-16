@@ -141,9 +141,9 @@ Commands hold delegates bound to a specific instance and break with cloning.
 Connection loop creates a **new `TcpClient` per attempt** — `TcpClient` cannot be reconnected after use. The old singleton instance caused `SocketException(IsConnected)` on the second connect attempt after a drop.
 
 Key rules:
-- `OnDisconnected` fires on a mid-loop drop (not just on full dispose) — `wasConnected` flag tracks whether `OnConnect` was actually raised
+- A lost connection ends the loop (`if (wasConnected) break;`, no retry wait). `Connect()` then raises `OnDisconnected` once, and `CommunicationHandler` connects again with a new object. Only failed connect attempts are retried in the loop (since package `1.0.0-build-0029`; before, the loop raised `OnDisconnected` on a drop and connected again by itself)
 - `catch (Exception e) when (e is SocketException or IOException)` — `IOException` wrapping `SocketException` must be caught alongside bare `SocketException`
-- Retry delay uses `await Task.Delay(timeout, cancellationToken)` — cancellable, not `Thread.Sleep`
+- Retry delay after a failed connect attempt uses `await Task.Delay(timeout, cancellationToken)` — cancellable, not `Thread.Sleep`
 - `Dispose` catches `AggregateException` from `receiveDataLoopTask.Wait()` containing expected shutdown exceptions
 - `activeTcpClient` uses `Volatile.Read/Write` for cross-thread visibility (single writer: loop; reader: `SendData`)
 

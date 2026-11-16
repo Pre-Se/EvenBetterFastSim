@@ -96,13 +96,19 @@ public partial class ScenarioNodeViewModel : ObservableObject
     public bool IsDeletable => Type is not (NodeType.Start or NodeType.End);
 
     /// <summary>
-    /// A node dragged from the palette (And, Wait). A Wait node starts with
-    /// <see cref="WaitTime.DefaultMilliseconds"/>; double-click it to change the time.
+    /// A node dragged from the palette (And, Wait, Drop connection, Wait for communication). A node with a time in ms
+    /// starts with its default; double-click it to change the time.
     /// </summary>
     public static ScenarioNodeViewModel CreateStructural(NodeType type, Point location) => new()
     {
         Type = type,
-        TransactionName = type == NodeType.Wait ? WaitTime.Format(WaitTime.DefaultMilliseconds) : null,
+        TransactionName = type switch
+        {
+            NodeType.Wait => NodeMilliseconds.Format(WaitTime.DefaultMilliseconds),
+            NodeType.DropConnection => NodeMilliseconds.Format(DropConnectionTime.DefaultMilliseconds),
+            NodeType.WaitForCommunication => NodeMilliseconds.Format(CommunicationTimeout.DefaultMilliseconds),
+            _ => null
+        },
         Location = location
     };
 
@@ -158,6 +164,10 @@ public partial class ScenarioNodeViewModel : ObservableObject
             NodeType.Receive     => ["Success", "Failure"],
             NodeType.Condition   => ["YES", "NO"],
             NodeType.And         => ["Out"],
+            // Both fail in normal use (no connection to drop, communication not back in time), so they need the
+            // failure output; without it a failure ends the whole run.
+            NodeType.DropConnection       => ["Success", "Failure"],
+            NodeType.WaitForCommunication => ["Success", "Failure"],
             _                    => ["Done"],
         };
 
@@ -191,6 +201,8 @@ public partial class ScenarioNodeViewModel : ObservableObject
             NodeType.Send => label ?? "Send",
             NodeType.Condition => label ?? "If",
             NodeType.Wait => WaitTime.Title(TransactionName),
+            NodeType.DropConnection => DropConnectionTime.Title(TransactionName),
+            NodeType.WaitForCommunication => CommunicationTimeout.Title(TransactionName),
             NodeType.Receive => label ?? "Receive",
             NodeType.And => "AND",
             _ => label ?? Type.ToString()
