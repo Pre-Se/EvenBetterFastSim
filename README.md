@@ -98,8 +98,12 @@ The **Scenarios** section is a visual node graph for multi-step exchanges. Drag 
 transaction from the **DRAG TO CANVAS** palette onto the canvas, wire nodes from **Start**
 to **End**, and press **Run** to execute them in order against the live connection.
 
-Node types: **Send**, **Send & Wait** (send and wait for the reply), **Receive** (wait for a
-matching incoming message, 30 s timeout) and **Wait** (a fixed delay). Scenarios are saved per instance and can be exported / imported.
+Node types: **Send** and **Send & Wait** (both send the message and go on at once; neither waits for the
+reply), **Receive** (waits for a matching incoming message until the run's **Timeout (s)** is over; with 0 it
+waits until the message arrives or you press **Cancel**) and **Wait** (a fixed delay). To wait for a reply, put
+a Receive node after the Send node. Drag **WAIT** from the **NODES** palette onto the canvas and double-click
+the node to set its time in milliseconds; the node shows it as "Wait 1500 ms".
+Scenarios are saved per instance and can be exported / imported.
 
 ### 7. Two instances talking
 

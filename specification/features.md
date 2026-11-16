@@ -2,6 +2,36 @@
 
 Related docs: [project_overview.md](project_overview.md), [secsgembase_library.md](secsgembase_library.md), [dialog_pattern.md](dialog_pattern.md), [SESSION_REFACTORING_LOG.md](../SESSION_REFACTORING_LOG.md)
 
+## Wait node on the canvas
+
+A Wait node can be made and edited in the app (internal board, issue 18). Until then it only came from an imported
+file, its time could only be changed in the file, and a value the engine cannot read ("20 s", "12,6") silently meant
+"no wait" while the node only showed its name or the bare number.
+
+**Files:** `WPF/ViewModels/Graph/WaitTime.cs`, `WPF/ViewModels/Graph/ScenarioNodeViewModel.cs` (`CreateStructural`,
+title), `WPF/ViewModels/NodeMillisecondsViewModel.cs`, `WPF/Windows/NodeMillisecondsView.xaml`,
+`WPF/ViewModels/ScenariosViewModel.cs` (`OpenNodeEditor`, `AddStructuralNode`), `WPF/Windows/MainWindow.xaml` (palette
+chip, node colour), `Window Helpers/DialogWindow.xaml` and `.xaml.cs`, `Services/WindowMapper.cs`.
+
+- **Palette:** the chip **WAIT** next to AND. Dropping it on the canvas makes a Wait node with 1000 ms.
+- **Editor:** double-click, right-click or Enter on the node opens the dialog "Wait" with the field "Wait time (ms)".
+  It accepts a whole number from 1 to 2147483647 written in digits; OK or Enter writes it to the node's
+  `TransactionName`, where the engine reads it. Spaces and characters nobody can see at the ends of the text are
+  ignored; inside the number the message under the field names them.
+- **Title:** "Wait 1500 ms". A value the engine cannot read shows as "Wait (invalid: 20 s)", a missing one as
+  "Wait (no time set)". A character nobody can see in such a value (a non-breaking space from a hand-edited file)
+  shows as "[U+00A0]". A `DisplayName` from a file no longer replaces the time.
+- A time with a leading sign ("+5", only possible in a hand-edited file) shows as valid only if the culture of the
+  computer reads it too: the engine up to package `1.0.0-build-0027` reads with that culture, a later one with the
+  invariant culture (`WaitTime.TryRead`). Where the plus sign of the regional settings is "+", the two agree.
+- `NodeMillisecondsViewModel` takes its title, label and minimum, so other node types with a time in ms can use it.
+  It is not an `ObservableValidator`: `DialogWindow` binds its content to the view model, and WPF then draws its red
+  validation frame around the whole dialog.
+- The engine in SecsGemBase logs a warning for a time it cannot read once its change for this issue
+  ([SecsGemBase pull request 12](https://github.com/Pre-Se/SecsGemBase/pull/12)) is published and the app's packages
+  are raised to it. Every package up to `1.0.0-build-0027` skips the wait silently (the app pinned
+  `1.0.0-build-0018` when this was written), and the title is then the only sign.
+
 ## Scenario runs leave the UI thread
 
 A scenario (Run or a loop) now executes on the thread pool. Until then every node ran on the WPF UI thread, because

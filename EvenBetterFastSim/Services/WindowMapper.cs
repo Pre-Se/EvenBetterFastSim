@@ -28,6 +28,7 @@ public class WindowMapper
         RegisterMapping<InspectSecsGemItemViewModel, DialogWindow>();
         RegisterMapping<SecsGemTransactionViewModel, DialogWindow>();
         RegisterMapping<WPF.ViewModels.Responders.NodeResponderViewModel, DialogWindow>();
+        RegisterMapping<NodeMillisecondsViewModel, DialogWindow>();
     }
 
     /// <summary>

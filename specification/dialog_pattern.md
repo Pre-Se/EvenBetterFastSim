@@ -28,6 +28,8 @@ Related docs: [patterns.md](patterns.md), [project_overview.md](project_overview
 | `AddReportViewModel` | `AddReportView` | Done |
 | `AddEquipmentVariableViewModel` | `AddEquipmentVariableView` | Done |
 | `InstanceProfileViewModel` | `InstanceProfileView` | Done |
+| `NodeResponderViewModel` | `NodeResponderView` | Done |
+| `NodeMillisecondsViewModel` | `NodeMillisecondsView` | Done (constructed by the caller, not registered in DI) |
 | `SetUpViewModel` | `SetUpWindow` | Done |
 
 ## ViewModel conventions

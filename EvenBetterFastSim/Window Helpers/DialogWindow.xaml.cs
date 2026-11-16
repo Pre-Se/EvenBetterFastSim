@@ -1,4 +1,5 @@
 using System.Windows.Input;
+using EvenBetterFastSim.WPF.ViewModels;
 using EvenBetterFastSim.WPF.ViewModels.Responders;
 using Wpf.Ui.Controls;
 
@@ -19,6 +20,12 @@ public partial class DialogWindow : FluentWindow
                 Height = 680;
                 MinWidth = 560;
                 MinHeight = 460;
+            }
+            // A single field: the default form size would be mostly empty.
+            else if (e.NewValue is NodeMillisecondsViewModel)
+            {
+                Width = 460;
+                Height = 300;
             }
         };
     }

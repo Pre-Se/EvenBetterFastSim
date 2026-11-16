@@ -613,6 +613,10 @@
                                                         <Setter Property="HeaderBrush" Value="#8957E5" />
                                                         <Setter Property="BorderBrush" Value="#8957E5" />
                                                     </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Type}" Value="Wait">
+                                                        <Setter Property="HeaderBrush" Value="#BF8700" />
+                                                        <Setter Property="BorderBrush" Value="#BF8700" />
+                                                    </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
                                         </nodify:Node.Style>
@@ -783,6 +787,14 @@
                                         CornerRadius="4" Padding="10,4" Cursor="Hand"
                                         ToolTip="Join: continues only when every incoming connection has arrived">
                                     <TextBlock Text="AND" FontWeight="SemiBold" />
+                                </Border>
+                                <Border Tag="Wait"
+                                        MouseLeftButtonDown="NodePaletteChip_MouseLeftButtonDown"
+                                        Background="{DynamicResource SubtleFillColorSecondaryBrush}"
+                                        BorderBrush="#BF8700" BorderThickness="1"
+                                        CornerRadius="4" Padding="10,4" Margin="6,0,0,0" Cursor="Hand"
+                                        ToolTip="Wait: pauses for a time in ms before the scenario continues (double-click the node to set it)">
+                                    <TextBlock Text="WAIT" FontWeight="SemiBold" />
                                 </Border>
                             </WrapPanel>
 
