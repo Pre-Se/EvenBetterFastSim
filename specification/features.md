@@ -2,6 +2,40 @@
 
 Related docs: [project_overview.md](project_overview.md), [secsgembase_library.md](secsgembase_library.md), [dialog_pattern.md](dialog_pattern.md), [SESSION_REFACTORING_LOG.md](../SESSION_REFACTORING_LOG.md)
 
+## Connection drop nodes on the canvas
+
+The nodes **Drop connection** and **Wait for communication** can be made and edited in the app, and the app uses the
+SecsGemBase packages `1.0.0-build-0029` that execute them (internal board, issue 25). A scenario can now drop the
+connection after an event, keep the port closed for a time and go on when communication is back.
+
+**Files:** `EvenBetterFastSim.csproj` (package versions), `WPF/ViewModels/Graph/NodeMilliseconds.cs`,
+`DropConnectionTime.cs`, `CommunicationTimeout.cs`, `ScenarioNodeViewModel.cs` (outputs, titles, palette defaults),
+`WPF/ViewModels/NodeMillisecondsViewModel.cs` (`For`), `WPF/ViewModels/ScenariosViewModel.cs` (`OpenNodeEditor`,
+`RunOnceAsync`, `PortClosedByScenario`), `Services/PortHold.cs`, `WPF/ViewModels/MainViewModel.cs` (`CanConnect`),
+`WPF/Windows/MainWindow.xaml` (palette chips, node colours, Connect button).
+
+- **Engine:** both nodes run in the SecsGemBase engine (`NodeType.DropConnection` = 8, `WaitForCommunication` = 9).
+  It needs `CommunicationHandler` and `ControlMessageHandling`; the DI container passes both to
+  `ScenarioExecutionService`, they are registered in `App.ConfigureServices`.
+- **Parameter:** a time in ms as text in `TransactionName`, like the Wait node: the downtime (0 = connect again at
+  once) and the timeout (0 = as long as the run may take). The engine reads digits only and lets the node fail for
+  anything else (`NodeMilliseconds.TryReadDigits` reads the same way).
+- **Palette:** the chips **DROP CONNECTION** (5000 ms) and **WAIT FOR COMM.** (20000 ms).
+- **Outputs:** Success and Failure. Both nodes fail in normal use (no connection to drop, communication not back in
+  time); a failure without a failure edge ends the run.
+- **Title:** "Drop connection · 5000 ms", "Wait for communication · max 20000 ms" or "· no timeout"; a value the
+  engine cannot read shows as "(invalid: 5 s)", a missing one as "(no downtime set)" / "(no timeout set)".
+- **Editor:** `NodeMillisecondsViewModel.For(node)` gives the editor for all three node types with a time in ms;
+  for these two the minimum is 0 and the hint says what 0 does.
+- **Connect button:** disabled while a Drop connection node keeps the port closed; a click would open the port in
+  the middle of the downtime. The node reports `Waiting` for that time; `PortHold` keeps track per run, and the end
+  of a run releases its holds (a cancelled run reports nothing more for the node). Changing the endpoint in
+  Connection ▸ Properties during the downtime does not open the port: the restart only replaces the connection
+  object, and the node opens the port on the new endpoint when the downtime is over.
+- **Files:** no change to the file format. An older build does not know the two node types: it cannot run them and
+  drops their failure edges when it saves the scenario.
+- **Limits** that belong to the engine and the HSMS stack are listed in the README (section 6).
+
 ## Wait node on the canvas
 
 A Wait node can be made and edited in the app (internal board, issue 18). Until then it only came from an imported
@@ -21,16 +55,15 @@ chip, node colour), `Window Helpers/DialogWindow.xaml` and `.xaml.cs`, `Services
 - **Title:** "Wait 1500 ms". A value the engine cannot read shows as "Wait (invalid: 20 s)", a missing one as
   "Wait (no time set)". A character nobody can see in such a value (a non-breaking space from a hand-edited file)
   shows as "[U+00A0]". A `DisplayName` from a file no longer replaces the time.
-- A time with a leading sign ("+5", only possible in a hand-edited file) shows as valid only if the culture of the
-  computer reads it too: the engine up to package `1.0.0-build-0027` reads with that culture, a later one with the
-  invariant culture (`WaitTime.TryRead`). Where the plus sign of the regional settings is "+", the two agree.
+- `WaitTime.TryRead` reads the time like the engine since package `1.0.0-build-0029`: with the invariant culture,
+  so a file means the same on every computer. Up to `1.0.0-build-0027` the engine read with the culture of the
+  computer, which could take a leading sign differently.
 - `NodeMillisecondsViewModel` takes its title, label and minimum, so other node types with a time in ms can use it.
   It is not an `ObservableValidator`: `DialogWindow` binds its content to the view model, and WPF then draws its red
   validation frame around the whole dialog.
-- The engine in SecsGemBase logs a warning for a time it cannot read once its change for this issue
-  ([SecsGemBase pull request 12](https://github.com/Pre-Se/SecsGemBase/pull/12)) is published and the app's packages
-  are raised to it. Every package up to `1.0.0-build-0027` skips the wait silently (the app pinned
-  `1.0.0-build-0018` when this was written), and the title is then the only sign.
+- The engine logs a warning for a time it cannot read since package `1.0.0-build-0029`
+  ([SecsGemBase pull request 12](https://github.com/Pre-Se/SecsGemBase/pull/12)); the node still succeeds without
+  waiting. With the packages before that the wait was skipped silently and the title was the only sign.
 
 ## Scenario runs leave the UI thread
 

@@ -12,8 +12,8 @@ namespace EvenBetterFastSim.Tests;
 
 /// <summary>
 /// A Wait node can be made on the canvas and shows its time (GitLab secsgem/evencoolerfastsim#18). The time is text in
-/// TransactionName; the engine waits only for a whole number greater than 0 and takes anything else as "no wait"
-/// without an error, so the title has to say when the value is not a time.
+/// TransactionName; the engine waits only for a whole number greater than 0. For anything else the node still
+/// succeeds without waiting, so the title has to say when the value is not a time.
 /// </summary>
 public class WaitNodeTests
 {
@@ -29,6 +29,7 @@ public class WaitNodeTests
     [InlineData("99999999999", "Wait (invalid: 99999999999)")]
     [InlineData("2147483647", "Wait 2147483647 ms")]
     [InlineData("2147483648", "Wait (invalid: 2147483648)")]
+    [InlineData("+5", "Wait 5 ms")]
     [InlineData("\t250\r\n", "Wait 250 ms")]
     [InlineData("\t20 s\r\n", "Wait (invalid: 20 s)")]
     [InlineData("", "Wait (no time set)")]
@@ -60,30 +61,26 @@ public class WaitNodeTests
     }
 
     /// <summary>
-    /// A leading sign is the one thing the engine versions read differently: up to package 1.0.0-build-0027 with
-    /// the culture of the computer, later with the invariant culture. The culture decides which characters are the
-    /// signs: Windows takes them from the regional settings of the user, and ICU data write the plus sign of Persian
-    /// or Hebrew with a direction mark in front (U+200E U+002B). On a computer with such a plus sign "+5" is a
-    /// number for one engine and not for the other, so the title must not promise a wait. The culture is made by
-    /// hand, so the test does not depend on the culture data of the computer it runs on.
+    /// The title reads the time like the engine: with the invariant culture, whatever the culture of the computer is.
+    /// The culture decides which characters are the signs: Windows takes them from the regional settings of the user,
+    /// and ICU data write the plus sign of Persian or Hebrew with a direction mark in front (U+200E U+002B). A read
+    /// with such a culture does not take "+5" as a number. The culture is made by hand, so the test does not depend
+    /// on the culture data of the computer it runs on.
     /// </summary>
     [Fact]
-    public void Title_promises_a_wait_only_if_every_engine_version_reads_the_time()
+    public void Title_reads_the_time_like_the_engine_whatever_the_culture_of_the_computer()
     {
         var withMark = (CultureInfo)CultureInfo.InvariantCulture.Clone();
         withMark.NumberFormat.PositiveSign = "\u200E+";
         var before = CultureInfo.CurrentCulture;
         try
         {
-            CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
-            Assert.Equal("Wait 5 ms", WaitTime.Title("+5"));
-
             CultureInfo.CurrentCulture = withMark;
             // The culture is in effect: a read with the culture of the computer takes the other spelling.
             Assert.False(int.TryParse("+5", out _));
             Assert.True(int.TryParse("\u200E+5", out _));
 
-            Assert.Equal("Wait (invalid: +5)", WaitTime.Title("+5"));
+            Assert.Equal("Wait 5 ms", WaitTime.Title("+5"));
             Assert.Equal("Wait (invalid: [U+200E]+5)", WaitTime.Title("\u200E+5"));
             Assert.Equal("Wait 12600 ms", WaitTime.Title("12600"));
         }

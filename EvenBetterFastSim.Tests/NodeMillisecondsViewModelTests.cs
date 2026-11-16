@@ -206,5 +206,80 @@ public class NodeMillisecondsViewModelTests
         Assert.Contains(" 1 ", new NodeMillisecondsViewModel("t", "l", null, minimum: 1).Error);
     }
 
+    /// <summary>
+    /// Drop connection and Wait for communication use the same editor with their own texts (GitLab
+    /// secsgem/evencoolerfastsim#25). 0 is a value of its own there, so it is allowed and the hint says what it does.
+    /// </summary>
+    [Theory]
+    [InlineData(NodeType.DropConnection, "Drop connection", "Downtime (ms)", "With 0 a new connection is set up right away")]
+    [InlineData(NodeType.WaitForCommunication, "Wait for communication", "Timeout (ms)", "With 0 the node waits as long as the run may take")]
+    public void Connection_nodes_get_the_editor_with_their_own_texts_and_zero_allowed(
+        NodeType type, string header, string label, string note)
+    {
+        var node = new ScenarioNodeViewModel { Type = type, TransactionName = "5 s" };
+        var editor = NodeMillisecondsViewModel.For(node)!;
+
+        Assert.Equal(header, editor.HeaderText);
+        Assert.Equal(label, editor.Label);
+        Assert.StartsWith("Whole number from 0 to 2147483647. ", editor.Hint);
+        Assert.Contains(note, editor.Hint);
+        Assert.Equal("5 s", editor.Text);
+        Assert.Equal("This is not a whole number from 0 to 2147483647. Use digits only, for example 1500.", editor.Error);
+        Assert.False(editor.AcceptButtonClickCommand.CanExecute(null));
+
+        editor.Text = "0";
+        Assert.Null(editor.Error);
+        editor.AcceptButtonClickCommand.Execute(null);
+        editor.ApplyTo(node);
+
+        Assert.Equal("0", node.TransactionName);
+    }
+
+    /// <summary>What the editor accepts, the engine reads: digits only, also for these two node types.</summary>
+    [Theory]
+    [InlineData(NodeType.DropConnection, "+5")]
+    [InlineData(NodeType.DropConnection, "-1")]
+    [InlineData(NodeType.DropConnection, "1.5")]
+    [InlineData(NodeType.WaitForCommunication, "+5")]
+    [InlineData(NodeType.WaitForCommunication, "2147483648")]
+    [InlineData(NodeType.WaitForCommunication, "")]
+    public void Connection_nodes_take_digits_only(NodeType type, string text)
+    {
+        var node = new ScenarioNodeViewModel { Type = type, TransactionName = "100" };
+        var editor = NodeMillisecondsViewModel.For(node)!;
+
+        editor.Text = text;
+        editor.AcceptButtonClickCommand.Execute(null);
+        editor.ApplyTo(node);
+
+        Assert.NotNull(editor.Error);
+        Assert.False(editor.Accepted);
+        Assert.Equal("100", node.TransactionName);
+    }
+
+    [Fact]
+    public void Wait_node_gets_its_editor_and_does_not_allow_zero()
+    {
+        var editor = NodeMillisecondsViewModel.For(WaitNode("0"))!;
+
+        Assert.Equal("Wait", editor.HeaderText);
+        Assert.Equal("Wait time (ms)", editor.Label);
+        Assert.Equal("Whole number from 1 to 2147483647.", editor.Hint);
+        Assert.NotNull(editor.Error);
+    }
+
+    [Theory]
+    [InlineData(NodeType.Start)]
+    [InlineData(NodeType.End)]
+    [InlineData(NodeType.And)]
+    [InlineData(NodeType.Send)]
+    [InlineData(NodeType.SendAndWait)]
+    [InlineData(NodeType.Receive)]
+    [InlineData(NodeType.Condition)]
+    public void Node_types_without_a_time_have_no_such_editor(NodeType type)
+    {
+        Assert.Null(NodeMillisecondsViewModel.For(new ScenarioNodeViewModel { Type = type }));
+    }
+
     private static ScenarioNodeViewModel WaitNode(string? time) => new() { Type = NodeType.Wait, TransactionName = time };
 }

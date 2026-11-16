@@ -141,6 +141,11 @@ public partial class MainViewModel : ObservableObject, IBaseViewModel
         EventLibraryManager = eventLibraryManager;
         this.eventReportHandler = eventReportHandler;
         ScenariosVm = scenariosVm;
+        ScenariosVm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ScenariosViewModel.PortClosedByScenario))
+                ConnectCommand.NotifyCanExecuteChanged();
+        };
 
         SecsGemEventCollection = eventLibraryManager.EventCollection;
         SecsGemReportCollection = eventLibraryManager.ReportCollection;
@@ -328,7 +333,10 @@ public partial class MainViewModel : ObservableObject, IBaseViewModel
         return false;
     }
 
-    [RelayCommand(AllowConcurrentExecutions = false)]
+    // Not while a scenario keeps the port closed: the click would open it in the middle of the downtime.
+    private bool CanConnect() => !ScenariosVm.PortClosedByScenario;
+
+    [RelayCommand(AllowConcurrentExecutions = false, CanExecute = nameof(CanConnect))]
     private async Task Connect()
     {
         try

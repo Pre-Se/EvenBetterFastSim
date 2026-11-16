@@ -617,6 +617,14 @@
                                                         <Setter Property="HeaderBrush" Value="#BF8700" />
                                                         <Setter Property="BorderBrush" Value="#BF8700" />
                                                     </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Type}" Value="DropConnection">
+                                                        <Setter Property="HeaderBrush" Value="#CF222E" />
+                                                        <Setter Property="BorderBrush" Value="#CF222E" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Type}" Value="WaitForCommunication">
+                                                        <Setter Property="HeaderBrush" Value="#1B7C83" />
+                                                        <Setter Property="BorderBrush" Value="#1B7C83" />
+                                                    </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
                                         </nodify:Node.Style>
@@ -796,6 +804,22 @@
                                         ToolTip="Wait: pauses for a time in ms before the scenario continues (double-click the node to set it)">
                                     <TextBlock Text="WAIT" FontWeight="SemiBold" />
                                 </Border>
+                                <Border Tag="DropConnection"
+                                        MouseLeftButtonDown="NodePaletteChip_MouseLeftButtonDown"
+                                        Background="{DynamicResource SubtleFillColorSecondaryBrush}"
+                                        BorderBrush="#CF222E" BorderThickness="1"
+                                        CornerRadius="4" Padding="10,4" Margin="0,6,6,0" Cursor="Hand"
+                                        ToolTip="Drop connection: aborts the connection with a TCP reset and keeps the port closed for a downtime in ms (double-click the node to set it)">
+                                    <TextBlock Text="DROP CONNECTION" FontWeight="SemiBold" />
+                                </Border>
+                                <Border Tag="WaitForCommunication"
+                                        MouseLeftButtonDown="NodePaletteChip_MouseLeftButtonDown"
+                                        Background="{DynamicResource SubtleFillColorSecondaryBrush}"
+                                        BorderBrush="#1B7C83" BorderThickness="1"
+                                        CornerRadius="4" Padding="10,4" Margin="0,6,0,0" Cursor="Hand"
+                                        ToolTip="Wait for communication: waits until data messages can be exchanged again (HSMS selected, communication established), at most a timeout in ms (double-click the node to set it)">
+                                    <TextBlock Text="WAIT FOR COMM." FontWeight="SemiBold" />
+                                </Border>
                             </WrapPanel>
 
                             <TextBlock Grid.Row="2" Text="DRAG TO CANVAS"
@@ -959,6 +983,8 @@
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                     <ui:Button Content="{Binding ConnectionValues.ActionText}"
                                Command="{Binding ConnectCommand}"
+                               ToolTip="Opens or closes the port. Disabled while a scenario keeps the port closed (Drop connection): the port opens again when the downtime is over, or at once when the run is cancelled."
+                               ToolTipService.ShowOnDisabled="True"
                                Appearance="Secondary" Padding="14,5" Margin="0,0,14,0" />
 
                     <Border Background="{Binding ConnectionValues.BackgroundColor}"

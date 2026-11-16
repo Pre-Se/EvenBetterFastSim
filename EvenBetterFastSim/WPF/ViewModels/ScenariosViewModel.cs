@@ -74,6 +74,15 @@ public partial class ScenariosViewModel : ObservableObject
     /// <summary>Scenarios currently executing (a one-off run or a loop), each with its own cancellation source.</summary>
     private readonly Dictionary<ScenarioListItem, CancellationTokenSource> activeRuns = [];
 
+    private readonly Services.PortHold portHold = new();
+
+    /// <summary>
+    /// True while a Drop connection node of a running scenario keeps the port closed. The Connect button is disabled
+    /// meanwhile: a click would open the port in the middle of the downtime (GitLab secsgem/evencoolerfastsim#25).
+    /// </summary>
+    [ObservableProperty]
+    private bool portClosedByScenario;
+
     public ICommand DisconnectConnectorCommand { get; }
 
     public ICommand DeleteSelectionCommand { get; }
@@ -299,6 +308,7 @@ public partial class ScenariosViewModel : ObservableObject
         System.Collections.Concurrent.ConcurrentDictionary<global::Logging.Interfaces.ILoggedDataMessage, byte>? consumed,
         CancellationToken token)
     {
+        var portHoldRun = portHold.Begin();
         try
         {
             // Build from the scenario's own canvas so a loop keeps running even while another
@@ -316,10 +326,18 @@ public partial class ScenariosViewModel : ObservableObject
             if (canvasNodes != null)
                 foreach (var n in canvasNodes) { n.RunState = ScenarioNodeRunState.Idle; n.RunDetail = null; }
 
-            IProgress<ScenarioNodeProgress>? progress = canvasNodes is null ? null
+            // Which Drop connection node keeps the port closed is tracked also for a scenario that runs from its
+            // stored graph (never opened on the canvas).
+            var dropNodes = graph.Nodes.Where(n => n.Type == NodeType.DropConnection).Select(n => n.Id).ToHashSet();
+            IProgress<ScenarioNodeProgress>? progress = canvasNodes is null && dropNodes.Count == 0 ? null
                 : new Progress<ScenarioNodeProgress>(p =>
                 {
-                    if (canvasNodes.FirstOrDefault(n => n.Id == p.NodeId) is not { } vm) return;
+                    if (dropNodes.Contains(p.NodeId))
+                    {
+                        portHold.Report(portHoldRun, p.NodeId, p.State);
+                        PortClosedByScenario = portHold.Active;
+                    }
+                    if (canvasNodes?.FirstOrDefault(n => n.Id == p.NodeId) is not { } vm) return;
                     if (Services.ScenarioRun.IsStale(vm.RunState, p)) return;
                     vm.RunState = p.State;
                     vm.RunDetail = p.Detail;
@@ -358,6 +376,21 @@ public partial class ScenariosViewModel : ObservableObject
         catch (Exception ex)
         {
             LogError($"Scenario '{scenario.Name}' errored: {ex.Message}");
+        }
+        finally
+        {
+            // A run that ends during the downtime (cancelled, timed out, failed in another branch) reports nothing
+            // more for the node; the engine has opened the port again on its way out.
+            portHold.End(portHoldRun);
+            PortClosedByScenario = portHold.Active;
+            // So the node's hourglass "port closed, opens again in N ms" must not stay either.
+            if (scenario.CachedNodes is { } shownNodes)
+                foreach (var node in shownNodes)
+                    if (node.Type == NodeType.DropConnection && node.RunState == ScenarioNodeRunState.Waiting)
+                    {
+                        node.RunState = ScenarioNodeRunState.Idle;
+                        node.RunDetail = null;
+                    }
         }
     }
 
@@ -553,7 +586,8 @@ public partial class ScenariosViewModel : ObservableObject
 
     /// <summary>
     /// Opens the editor for a node: match conditions for a Receive node, response values for a
-    /// Send node, the time for a Wait node. Invoked by right-click / double-click / Enter on the canvas.
+    /// Send node, the time in ms for a Wait, Drop connection or Wait for communication node.
+    /// Invoked by right-click / double-click / Enter on the canvas.
     /// </summary>
     [RelayCommand]
     private void OpenNodeEditor(ScenarioNodeViewModel? node)
@@ -575,9 +609,9 @@ public partial class ScenariosViewModel : ObservableObject
                 windowManager.ShowDialog(vm);
                 break;
             }
-            case NodeType.Wait:
+            case NodeType.Wait or NodeType.DropConnection or NodeType.WaitForCommunication:
             {
-                var vm = NodeMillisecondsViewModel.ForWait(node);
+                if (NodeMillisecondsViewModel.For(node) is not { } vm) break;
                 windowManager.ShowDialog(vm);
                 vm.ApplyTo(node);
                 break;

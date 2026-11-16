@@ -228,7 +228,8 @@ public class ScenarioRunTests
 
     /// <summary>
     /// No library transaction is copied into nodes that carry their own, nodes whose TransactionName is a parameter
-    /// (Wait: ms), and nodes with a name the library does not know (the engine reports those).
+    /// (Wait, Drop connection, Wait for communication: ms), and nodes with a name the library does not know (the
+    /// engine reports those).
     /// </summary>
     [Fact]
     public void Other_nodes_keep_what_they_have()
@@ -241,6 +242,8 @@ public class ScenarioRunTests
             [
                 new ScenarioNode { Type = NodeType.Send, TransactionName = transaction.PrimaryMessage.Name, TransactionJson = own },
                 new ScenarioNode { Type = NodeType.Wait, TransactionName = transaction.PrimaryMessage.Name },
+                new ScenarioNode { Type = NodeType.DropConnection, TransactionName = transaction.PrimaryMessage.Name },
+                new ScenarioNode { Type = NodeType.WaitForCommunication, TransactionName = transaction.PrimaryMessage.Name },
                 new ScenarioNode { Type = NodeType.Receive, TransactionName = "not in the library" },
                 new ScenarioNode { Type = NodeType.Send, TransactionName = "  " }
             ]
